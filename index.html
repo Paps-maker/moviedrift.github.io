@@ -765,16 +765,12 @@ a.download-link:hover,
    SMALL PREMIUM TRENDING & TOP RATED BUTTONS
 =============================== */
 #trendingBtn, #topRatedBtn {
-  display: inline-block !important;
-  visibility: visible !important;
-  position: relative;
-  z-index: 9999;
-
   background: linear-gradient(135deg, #00ff80, #00ccff);
   border: none;
   color: #000;
   font-weight: 700;
-  padding: 6px 12px;        /* small size */
+  padding: 6px 12px;        /* smaller size */
+  margin-left: 6px;
   border-radius: 8px;        /* slightly rounded */
   cursor: pointer;
   font-size: 12px;           /* small font */
@@ -784,181 +780,27 @@ a.download-link:hover,
   text-transform: uppercase;
 }
 
-/* Hover effect */
 #trendingBtn:hover, #topRatedBtn:hover {
-  transform: translateY(-1px) scale(1.03);
+  transform: translateY(-1px) scale(1.03); /* subtle hover */
   box-shadow: 0 0 20px rgba(0,255,150,0.35);
-}
-
-/* Disabled state while movies load */
-#trendingBtn[disabled], #topRatedBtn[disabled] {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 /* Responsive adjustments */
 @media(max-width:768px){
-  #trendingBtn, #topRatedBtn { font-size:11px; padding:5px 10px; }
+  #trendingBtn, #topRatedBtn {
+    font-size: 11px;
+    padding: 5px 10px;
+    margin-left: 4px;
+  }
 }
+
 @media(max-width:480px){
-  #trendingBtn, #topRatedBtn { font-size:10px; padding:4px 8px; }
+  #trendingBtn, #topRatedBtn {
+    font-size: 10px;
+    padding: 4px 8px;
+    margin-left: 3px;
+  }
 }
-.carousel-wrapper {
-  position: relative;
-}
-
-/* ---------------- Arrows ---------------- */
-.arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 10;
-  background-color: rgba(0,0,0,0.7);
-  border: none;
-  color: #fff;
-  font-size: 24px;
-  cursor: pointer;
-  border-radius: 50%;
-  padding: 5px 10px;
-  transition: background 0.3s ease;
-}
-
-.arrow:hover {
-  background-color: #00ff66;
-  color: #000;
-}
-
-.arrow.left {
-  left: 0;
-}
-
-.arrow.right {
-  right: 0;
-}
-
-/* ---------------- Sections ---------------- */
-.carousel-section {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.5s ease, padding 0.5s ease;
-  padding: 0 20px;
-  margin-bottom: 30px;
-}
-
-.carousel-section.show {
-  max-height: 1000px; /* large enough to show carousel */
-  padding: 20px;
-}
-
-.carousel-section h2 {
-  color: var(--accent);
-  font-size: 1.5rem;
-  margin-bottom: 12px;
-}
-
-/* ---------------- Carousel ---------------- */
-.carousel-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.carousel {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  padding: 10px 0;
-}
-
-.carousel::-webkit-scrollbar {
-  display: none; /* hide scrollbar */
-}
-
-/* ---------------- Movie Cards ---------------- */
-.carousel .card {
-  flex: 0 0 auto;
-  width: 150px;
-  height: 225px;
-  border-radius: 10px;
-  overflow: hidden;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-  transition: transform 0.3s ease;
-}
-
-.carousel .card img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover; /* ensures perfect poster fit */
-  display: block;
-}
-
-.carousel .card:hover {
-  transform: scale(1.05);
-}
-
-/* ---------------- Movie Title ---------------- */
-.carousel .card .title {
-  font-size: 14px;
-  font-weight: bold;
-  color: var(--text);
-  text-align: center;
-  padding: 4px 2px;
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0,0,0,0.5);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ---------------- Movie Rating ---------------- */
-.carousel .card .rating {
-  font-size: 12px;
-  color: var(--accent);
-  text-align: center;
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  background: rgba(0,0,0,0.5);
-  padding: 2px 4px;
-  border-radius: 4px;
-}
-
-/* ---------------- Toggle Buttons ---------------- */
-#toggleTrending,
-#toggleTopRated {
-  background-color: #000;          /* black background */
-  color: #00ff66;                  /* accent green text */
-  border: 2px solid #00ff66;       /* green border */
-  padding: 6px 16px;               /* compact size */
-  font-size: 14px;                  /* small, readable */
-  font-weight: bold;
-  cursor: pointer;
-  border-radius: 6px;              /* subtle rounding */
-  transition: all 0.3s ease;
-  margin: 0 6px;                    /* spacing between buttons */
-}
-
-#toggleTrending:hover,
-#toggleTopRated:hover {
-  background-color: #00ff66;       /* green on hover */
-  color: #000;                     /* black text on hover */
-  transform: scale(1.05);          /* subtle pop effect */
-}
-
-#toggleTrending:focus,
-#toggleTopRated:focus {
-  outline: none;                   /* remove default focus outline */
-  box-shadow: 0 0 6px #00ff66;    /* glow on focus */
-}
-
 
 </style>
 </head>
@@ -976,7 +818,8 @@ a.download-link:hover,
     </div>
     <input id="search" type="search" placeholder="Search movies...">
   </div>
-
+ <button id="trendingBtn" class="btn">Trending Now</button>
+<button id="topRatedBtn" class="btn">Top Rated</button>
   <div class="controls md-menu">
     <select id="themeSelector" title="Theme">
       <option value="dark">Dark Green (Default)</option>
@@ -1006,32 +849,7 @@ a.download-link:hover,
 
     <button id="watchlistToggle" class="btn">Watchlist (0)</button>
   </div>
-   
 </header>
-<button id="toggleTrending">Trending</button>
-  <button id="toggleTopRated">Top Rated</button>
-<div class="toggle-buttons">
- 
-</div>
-
-<section id="trendingSection" class="carousel-section">
-  <h2>🔥 Trending Movies</h2>
-  <div class="carousel-wrapper">
-    <button class="left arrow" data-target="trendingCarousel">‹</button>
-    <div class="carousel" id="trendingCarousel"></div>
-    <button class="right arrow" data-target="trendingCarousel">›</button>
-  </div>
-</section>
-
-<section id="topRatedSection" class="carousel-section">
-  <h2>⭐ Top Rated Movies</h2>
-  <div class="carousel-wrapper">
-    <button class="left arrow" data-target="topRatedCarousel">‹</button>
-    <div class="carousel" id="topRatedCarousel"></div>
-    <button class="right arrow" data-target="topRatedCarousel">›</button>
-  </div>
-</section>
-
 <main><div id="grid" class="grid"></div></main>
 <button id="installBtn" style="
   position:fixed;
@@ -1065,7 +883,6 @@ btn.addEventListener("click", () => {
   deferredPrompt = null;
 });
 </script>
-
 
 <!-- Movie Modal -->
 <div class="modal" id="movieModal">
@@ -1227,8 +1044,15 @@ btn.addEventListener("click", () => {
 }
 </style>
 
-
-
+<div id="featuredModal" class="md-modal">
+  <div class="featured-box">
+    <div class="featured-header">
+      <h2 id="featuredTitle"></h2>
+      <span id="closeFeatured" class="closeFeatured">&times;</span>
+    </div>
+    <div id="featuredGrid" class="featured-grid"></div>
+  </div>
+</div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getFirestore, collection, doc, onSnapshot, query, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
@@ -1290,74 +1114,17 @@ function watchUserStatus() {
   });
 }
 
+/* ---------------- Load movies ---------------- */
 onSnapshot(collection(db, "movies"), snapshot => {
   movies = snapshot.docs.map(d => {
     const data = d.data();
     const createdAt = data.createdAt?.seconds ? data.createdAt.seconds*1000 : data.createdAt||0;
     const year = parseInt(data.year)||0;
     return { id:d.id, ...data, createdAt, year };
-  }).sort((a,b)=> b.year!==a.year ? b.year-a.year : b.createdAt-a.createdAt);
-
+  }).sort((a,b)=>b.year!==a.year? b.year-a.year : b.createdAt-a.createdAt);
   populateFilters();
   renderMovies();
-
-  // Populate Trending
-  const trendingCarousel = document.getElementById("trendingCarousel");
-  trendingCarousel.innerHTML = "";
-  const trending = [...movies].sort((a,b)=> (b.createdAt||0) - (a.createdAt||0)).slice(0,20);
-  trending.forEach(m => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <img src="${m.poster || ''}" alt="${m.title}">
-      <div class="title">${m.title}</div>
-      <div class="rating">⭐ ${m.rating ? m.rating.toFixed(1) : "N/A"}</div>
-    `;
-    card.onclick = () => protectedAction("watch", movies.findIndex(x=>x.id===m.id));
-    trendingCarousel.appendChild(card);
-  });
-
-  // Populate Top Rated
-  const topRatedCarousel = document.getElementById("topRatedCarousel");
-  topRatedCarousel.innerHTML = "";
-  const topRated = [...movies].sort((a,b)=> (b.rating||0) - (a.rating||0)).slice(0,20);
-  topRated.forEach(m => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <img src="${m.poster || ''}" alt="${m.title}">
-      <div class="title">${m.title}</div>
-      <div class="rating">⭐ ${m.rating ? m.rating.toFixed(1) : "N/A"}</div>
-    `;
-    card.onclick = () => protectedAction("watch", movies.findIndex(x=>x.id===m.id));
-    topRatedCarousel.appendChild(card);
-  });
 });
-document.querySelectorAll(".arrow").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const targetId = btn.dataset.target;
-    const carousel = document.getElementById(targetId);
-    const scrollAmount = 300; // adjust to card width
-
-    if (btn.classList.contains("left")) {
-      carousel.scrollBy({ left: -scrollAmount, behavior: "smooth" });
-    } else {
-      carousel.scrollBy({ left: scrollAmount, behavior: "smooth" });
-    }
-  });
-});
-
-const trendingSection = document.getElementById("trendingSection");
-const topRatedSection = document.getElementById("topRatedSection");
-
-document.getElementById("toggleTrending").onclick = () => {
-  trendingSection.classList.toggle("show");
-};
-
-document.getElementById("toggleTopRated").onclick = () => {
-  topRatedSection.classList.toggle("show");
-};
-
 
 /* Filters */
 function populateFilters() {
@@ -1862,7 +1629,104 @@ menuToggle.onclick = () => {
   menuToggle.classList.toggle("active");
   menu.classList.toggle("active");
 };
+  /* =============================
+   FEATURED MODAL CORE FUNCTIONS (PREMIUM)
+============================= */
 
+const featuredModal = document.getElementById("featuredModal");
+const featuredTitle = document.getElementById("featuredTitle");
+const featuredGrid = document.getElementById("featuredGrid");
+const closeFeatured = document.getElementById("closeFeatured");
+
+// Close modal
+function closeFeaturedModal() {
+  featuredModal.classList.remove("show");
+  document.body.style.overflow = "auto"; // unlock scroll
+}
+
+// Close X button
+closeFeatured.onclick = closeFeaturedModal;
+
+// Close by clicking background
+window.addEventListener("click", e => {
+  if (e.target === featuredModal) closeFeaturedModal();
+});
+
+// Open Featured Modal
+function openFeatured(title, list) {
+  featuredTitle.textContent = title;
+  featuredGrid.innerHTML = "";
+
+  list.forEach(m => {
+    const index = movies.findIndex(x => x.id === m.id);
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    // Click movie → close Featured modal → open video modal
+    card.onclick = () => {
+      closeFeaturedModal();
+      protectedAction("watch", index); // your existing video modal function
+    };
+
+    card.innerHTML = `
+      <img src="${m.poster || ''}" alt="${m.title}">
+      <div class="title">${m.title}</div>
+      <div class="rating">⭐ ${m.rating ? m.rating.toFixed(1) : "N/A"}</div>
+    `;
+
+    featuredGrid.appendChild(card);
+  });
+
+  featuredModal.classList.add("show");
+  document.body.style.overflow = "hidden"; // lock scroll
+}
+
+/* ============================
+   ATTACH BUTTON EVENTS SAFELY
+============================ */
+function setupTrendingAndTopRated() {
+  const trendingBtn = document.getElementById("trendingBtn");
+  const topRatedBtn = document.getElementById("topRatedBtn");
+
+  if (!trendingBtn || !topRatedBtn) return;
+
+  // 🔥 Trending (latest movies)
+  trendingBtn.onclick = () => {
+    const trending = [...movies]
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      .slice(0, 20);
+
+    openFeatured(" Trending Movies", trending);
+  };
+
+  // ⭐ Top Rated (highest ratings)
+  topRatedBtn.onclick = () => {
+    const top = [...movies]
+      .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      .slice(0, 20);
+
+    openFeatured(" Top Rated Movies", top);
+  };
+}
+
+/* ===============================
+   FIRESTORE LOAD → ACTIVATE ALL
+================================ */
+onSnapshot(collection(db, "movies"), snapshot => {
+  movies = snapshot.docs.map(d => {
+    const data = d.data();
+    const createdAt = data.createdAt?.seconds ? data.createdAt.seconds*1000 : data.createdAt || 0;
+    const year = parseInt(data.year) || 0;
+    return { id:d.id, ...data, createdAt, year };
+  }).sort((a,b)=>b.year!==a.year? b.year-a.year : b.createdAt-a.createdAt);
+
+  populateFilters();
+  renderMovies();
+
+  // ⭐ Activate trending/top-rated buttons ONLY after movies load
+  setupTrendingAndTopRated();
+});
 
 
 
@@ -1873,6 +1737,7 @@ menuToggle.onclick = () => {
 
 </body>
 </html>
+
 
 
 
