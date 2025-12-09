@@ -821,9 +821,70 @@ a.download-link:hover,
     margin-left: 3px;
   }
 }
+/* ===========================
+   BACK TO TOP BUTTON (UP ARROW)
+=========================== */
+#backToTop {
+  position: fixed;
+  right: 18px;
+  bottom: 20px;
+  width: 48px;
+  height: 48px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 2px solid #00ff80;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.35s ease;
+  box-shadow: 0 0 14px rgba(0,255,120,0.35);
+  backdrop-filter: blur(6px);
+}
+
+#backToTop .arrow {
+  font-size: 22px;
+  font-weight: 900;
+  color: #00ff80;
+  transition: 0.25s ease;
+}
+
+/* Hover Effect */
+#backToTop:hover {
+  transform: scale(1.12) translateY(-4px);
+  box-shadow: 0 0 26px rgba(0,255,150,0.55);
+  background: #00ff80;
+}
+
+#backToTop:hover .arrow {
+  color: #000; /* black arrow when hovered */
+}
+
+/* Show Button After Scroll */
+#backToTop.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Mobile Tweaks */
+@media (max-width:480px){
+  #backToTop {
+    width: 42px;
+    height: 42px;
+  }
+  #backToTop .arrow {
+    font-size: 20px;
+  }
+}
 
 </style>
 </head>
+  <div id="backToTop">
+  <i class="arrow">▲</i>
+</div>
 <body>
 
 <header class="md-header">
@@ -1751,8 +1812,25 @@ onSnapshot(collection(db, "movies"), snapshot => {
 
 
 </script>
+<script>
+// Show button after scroll
+window.addEventListener("scroll", () => {
+  const btn = document.getElementById("backToTop");
+  if (window.scrollY > 250) {
+    btn.classList.add("show");
+  } else {
+    btn.classList.remove("show");
+  }
+});
+
+// Smooth scroll top
+document.getElementById("backToTop").addEventListener("click", () => {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+</script>
 
 
 </body>
 </html>
+
 
