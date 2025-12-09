@@ -1,4 +1,4 @@
-const CACHE_NAME = "moviedrift-cache-v2"; // increment this when you update files
+const CACHE_NAME = "moviedrift-cache-v2"; // increment this when updating
 
 self.addEventListener("install", event => {
   event.waitUntil(
@@ -10,7 +10,7 @@ self.addEventListener("install", event => {
       ]);
     })
   );
-  self.skipWaiting(); // activate new SW immediately
+  self.skipWaiting(); // activate immediately
 });
 
 self.addEventListener("activate", event => {
@@ -23,11 +23,18 @@ self.addEventListener("activate", event => {
       );
     })
   );
-  clients.claim(); // control pages immediately
+  clients.claim(); // take control immediately
+});
+
+// 🔥 IMPORTANT: allow page to tell SW to skip waiting
+self.addEventListener("message", event => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("fetch", event => {
-  // Network-first for HTML pages
+  // Network-first for main HTML
   if (event.request.mode === "navigate") {
     event.respondWith(
       fetch(event.request)
@@ -41,7 +48,7 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // Cache-first for everything else
+  // Cache-first for other files
   event.respondWith(
     caches.match(event.request).then(response => {
       return (
