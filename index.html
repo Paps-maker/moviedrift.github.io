@@ -1690,8 +1690,34 @@ genreFilter.onchange=renderMovies;
 yearFilter.onchange=renderMovies;
 document.getElementById("typeFilter").onchange=renderMovies;
 
-/* Theme */
-document.getElementById("themeSelector").onchange=function(){document.body.className='theme-'+this.value;}
+/* ---------------- THEME SYSTEM (Script2) ---------------- */
+const themeSelector = document.getElementById("themeSelector");
+
+// Load saved theme (fallback to dark)
+const savedTheme = localStorage.getItem("theme") || "dark";
+
+// Apply saved theme
+document.body.classList.add("theme-" + savedTheme);
+
+// Update selector UI
+if (themeSelector) {
+  themeSelector.value = savedTheme;
+
+  themeSelector.onchange = () => {
+    const theme = themeSelector.value;
+
+    // Remove all possible theme classes
+    ["theme-dark","theme-white","theme-pink","theme-blue","theme-gold","theme-purple"]
+      .forEach(c => document.body.classList.remove(c));
+
+    // Add new theme
+    document.body.classList.add("theme-" + theme);
+
+    // Save theme
+    localStorage.setItem("theme", theme);
+  };
+}
+
 
 /* Page init */
 loadCurrentUser();
@@ -2000,6 +2026,7 @@ document.getElementById("backToTop").addEventListener("click", () => {
 
 </body>
 </html>
+
 
 
 
