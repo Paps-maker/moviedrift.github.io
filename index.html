@@ -9,10 +9,30 @@
 
 <script>
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("service-worker.js")
-    .then(() => console.log("MovieDrift PWA Active"));
+    navigator.serviceWorker.register("service-worker.js").then(reg => {
+      console.log("MovieDrift PWA Active");
+
+      // If a new service worker is waiting to activate, reload page
+      if (reg.waiting) {
+        reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        window.location.reload();
+      }
+
+      // Listen for updates
+      reg.addEventListener("updatefound", () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener("statechange", () => {
+          if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+            // New version installed → activate + reload page
+            newWorker.postMessage({ type: "SKIP_WAITING" });
+            window.location.reload();
+          }
+        });
+      });
+    });
   }
 </script>
+
 
 <style>
 :root { --bg:#000; --card-bg:#0a0a0a; --accent:#00ff66; --text:#ddd; --muted:#888; }
@@ -1735,3 +1755,4 @@ onSnapshot(collection(db, "movies"), snapshot => {
 
 </body>
 </html>
+
