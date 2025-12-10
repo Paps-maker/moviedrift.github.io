@@ -1164,44 +1164,43 @@ a.download-link:hover,
 }
 .trailer-btn:hover { transform: translateY(-2px); }
 
-/* dots */
+/* Dots container */
 .trailer-dots {
   display: flex;
-  gap: 5px;
+  justify-content: center;   /* centers the dots perfectly */
   align-items: center;
-  margin-top: 10px;
-  flex-wrap: wrap;
+  gap: 5px;
+  padding: 10px 0;
+  width: 100%;               /* fits all screens */
 }
 
+/* Dot style */
 .trailer-dots .dot {
-  width: 7px;
+  width: 7px;                /* smaller + perfect on phones */
   height: 7px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.18);
-  transition: all .2s;
+  background: rgba(255,255,255,0.22);
+  transition: all .25s ease;
   cursor: pointer;
 }
 
+/* Active dot */
 .trailer-dots .dot.active {
   background: var(--accent);
-  transform: scale(1.4);
-  box-shadow: 0 0 6px rgba(0,255,120,0.25);
+  transform: scale(1.35);
+  box-shadow: 0 0 6px rgba(0,255,120,0.4);
 }
 
-/* MOBILE DOTS FIX */
-@media (max-width: 600px) {
-  .trailer-dots {
-    gap: 4px;
-    justify-content: center;
-    margin-top: 8px;
-  }
-
+/* Extra boost for very small phones */
+@media (max-width: 420px) {
   .trailer-dots .dot {
     width: 6px;
     height: 6px;
   }
+  .trailer-dots .dot.active {
+    transform: scale(1.25);
+  }
 }
-
 
 /* responsive */
 @media (max-width: 900px) {
@@ -2415,6 +2414,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
