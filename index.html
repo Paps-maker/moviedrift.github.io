@@ -1165,14 +1165,43 @@ a.download-link:hover,
 .trailer-btn:hover { transform: translateY(-2px); }
 
 /* dots */
-.trailer-dots { display:flex; gap:6px; margin-left: 12px; }
+.trailer-dots {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
 .trailer-dots .dot {
-  width: 10px; height: 10px; border-radius:50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
   background: rgba(255,255,255,0.18);
   transition: all .2s;
   cursor: pointer;
 }
-.trailer-dots .dot.active { background: var(--accent); transform: scale(1.25); box-shadow: 0 0 8px rgba(0,255,120,0.2); }
+
+.trailer-dots .dot.active {
+  background: var(--accent);
+  transform: scale(1.4);
+  box-shadow: 0 0 6px rgba(0,255,120,0.25);
+}
+
+/* MOBILE DOTS FIX */
+@media (max-width: 600px) {
+  .trailer-dots {
+    gap: 4px;
+    justify-content: center;
+    margin-top: 8px;
+  }
+
+  .trailer-dots .dot {
+    width: 6px;
+    height: 6px;
+  }
+}
+
 
 /* responsive */
 @media (max-width: 900px) {
@@ -2386,6 +2415,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
