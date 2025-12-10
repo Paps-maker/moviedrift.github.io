@@ -1064,6 +1064,94 @@ a.download-link:hover,
   }
 }
 
+/* Trailer Showcase - Dark Neon style */
+.trailer-showcase {
+  width: 100%;
+  background: linear-gradient(180deg, rgba(0,0,0,0.9), rgba(0,0,0,0.95));
+  padding: 18px 0;
+  box-sizing: border-box;
+}
+
+.trailer-player-wrap {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  position: relative;
+  aspect-ratio: 16/7;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(0,255,120,0.08);
+  box-shadow: 0 10px 40px rgba(0,255,120,0.06);
+}
+
+/* iframe container */
+#ytPlayerPlaceholder iframe { width:100%; height:100%; display:block; border:0; }
+
+/* overlay */
+.trailer-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.75), rgba(0,0,0,0.25));
+  box-sizing: border-box;
+}
+
+.trailer-meta { flex: 1 1 auto; min-width:0; }
+.trailer-title {
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 18px;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.trailer-desc {
+  color: var(--text);
+  font-size: 13px;
+  opacity: 0.9;
+  max-height: 40px;
+  overflow: hidden;
+  font-weight: 500;
+}
+
+/* controls */
+.trailer-controls { display:flex; gap:8px; align-items:center; }
+.trailer-btn {
+  background: linear-gradient(90deg,#00ff80,#00d5ff);
+  border: none;
+  padding: 8px 12px;
+  font-weight: 800;
+  color: #000;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,255,140,0.12);
+}
+.trailer-btn:hover { transform: translateY(-2px); }
+
+/* dots */
+.trailer-dots { display:flex; gap:6px; margin-left: 12px; }
+.trailer-dots .dot {
+  width: 10px; height: 10px; border-radius:50%;
+  background: rgba(255,255,255,0.18);
+  transition: all .2s;
+  cursor: pointer;
+}
+.trailer-dots .dot.active { background: var(--accent); transform: scale(1.25); box-shadow: 0 0 8px rgba(0,255,120,0.2); }
+
+/* responsive */
+@media (max-width: 900px) {
+  .trailer-player-wrap { aspect-ratio: 16/9; }
+  .trailer-title { font-size: 16px; }
+  .trailer-desc { font-size: 12px; }
+}
 
 </style>
 </head>
@@ -1120,7 +1208,27 @@ a.download-link:hover,
    
 </header>
 
+<!-- TRAILER SHOWCASE -->
+<section id="trailerShowcase" class="trailer-showcase">
+  <div class="trailer-player-wrap">
+    <div id="ytPlayerPlaceholder"></div>
 
+    <div class="trailer-overlay">
+      <div class="trailer-meta">
+        <div id="trailerTitle" class="trailer-title">Loading...</div>
+        <div id="trailerDesc" class="trailer-desc"></div>
+      </div>
+
+      <div class="trailer-controls">
+        <button id="prevTrailer" class="trailer-btn">Prev</button>
+        <button id="muteToggle" class="trailer-btn">Mute</button>
+        <button id="nextTrailer" class="trailer-btn">Next</button>
+      </div>
+
+      <div id="trailerDots" class="trailer-dots"></div>
+    </div>
+  </div>
+</section>
 <div class="toggle-buttons">
  
 </div>
@@ -1685,10 +1793,25 @@ function renderWatchlist(){
 window.removeFromWatchlist=function(i){watchlist.splice(i,1);localStorage.setItem("watchlist",JSON.stringify(watchlist));updateWatchlistCount();renderWatchlist();}
 
 /* Search & filters */
-document.getElementById("search").oninput=renderMovies;
-genreFilter.onchange=renderMovies;
-yearFilter.onchange=renderMovies;
-document.getElementById("typeFilter").onchange=renderMovies;
+const searchInput = document.getElementById("search");
+const trailerSection = document.getElementById("trailerShowcase"); // your trailer container
+
+function handleSearchAndFilter() {
+  renderMovies(); // your existing render
+  // Hide trailer section if search or filters have a value
+  const hasSearch = searchInput.value.trim().length > 0;
+  const hasGenre = genreFilter.value !== "";
+  const hasYear = yearFilter.value !== "";
+  const hasType = document.getElementById("typeFilter").value !== "";
+
+  trailerSection.style.display = (hasSearch || hasGenre || hasYear || hasType) ? "none" : "block";
+}
+
+// Attach to search and filters
+searchInput.oninput = handleSearchAndFilter;
+genreFilter.onchange = handleSearchAndFilter;
+yearFilter.onchange = handleSearchAndFilter;
+document.getElementById("typeFilter").onchange = handleSearchAndFilter;
 
 /* ---------------- THEME SYSTEM (Script2) ---------------- */
 const themeSelector = document.getElementById("themeSelector");
@@ -2019,13 +2142,221 @@ window.addEventListener("scroll", () => {
 document.getElementById("backToTop").addEventListener("click", () => {
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
-</script>
 
+/* ---------------- TRAILER SHOWCASE (manual + TMDB) ---------------- */
+document.addEventListener("DOMContentLoaded", () => {
+
+  /* ---------------- CONFIG ---------------- */
+  const manualTrailers = [
+    // add manual trailers here if you want
+  ];
+
+  const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
+  const tmdbMode = "now_playing";
+  const movieIds = [];
+  const tmdbLimit = 20;
+
+  /* ---------------- INTERNAL ---------------- */
+  const playerPlaceholder = document.getElementById("ytPlayerPlaceholder");
+  const titleEl = document.getElementById("trailerTitle");
+  const descEl = document.getElementById("trailerDesc");
+  const muteBtn = document.getElementById("muteToggle");
+  const nextBtn = document.getElementById("nextTrailer");
+  const prevBtn = document.getElementById("prevTrailer");
+  const dotsWrap = document.getElementById("trailerDots");
+
+  let playlist = [];
+  let currentIndex = 0;
+  let ytPlayer = null;
+  let isMuted = true;
+
+  /* ---------------- SEARCH HIDE TRAILERS ---------------- */
+  const searchInput = document.getElementById("searchInput");
+  const trailerSection = document.getElementById("trailerShowcase");
+
+  if (searchInput && trailerSection) {
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.trim();
+      trailerSection.style.display = q.length > 0 ? "none" : "block";
+    });
+  }
+
+  /* ---------------- UTIL ---------------- */
+  function extractYouTubeId(url) {
+    if (!url) return null;
+    if (/^[A-Za-z0-9_-]{11}$/.test(url)) return url;
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes("youtu.be")) return u.pathname.slice(1);
+      if (u.searchParams.has("v")) return u.searchParams.get("v");
+    } catch {}
+    const m = url.match(/[A-Za-z0-9_-]{11}/);
+    return m ? m[0] : null;
+  }
+
+  /* ---------------- FAST TMDB FETCH (LOAD ONE BY ONE) ---------------- */
+  async function buildPlaylist() {
+    // Add manual first:
+    manualTrailers.forEach(t => {
+      const id = extractYouTubeId(t.youtube);
+      if (id) playlist.push({ youtubeId: id, title: t.title, desc: t.desc });
+    });
+
+    // TMDB fetch
+    if (TMDB_API_KEY) {
+      try {
+        let movieList = [];
+
+        if (movieIds.length > 0) {
+          movieList = movieIds.map(id => ({ id }));
+        } else {
+          const r = await fetch(`https://api.themoviedb.org/3/movie/${tmdbMode}?api_key=${TMDB_API_KEY}&language=en-US`);
+          const json = await r.json();
+          movieList = json.results.slice(0, tmdbLimit);
+        }
+
+        // **Load trailers one-by-one fast**
+        loadNextTrailerData(movieList, 0);
+
+      } catch (e) {
+        console.warn("TMDB error", e);
+      }
+    } else {
+      finishPlaylist();
+    }
+  }
+
+  // fetch trailers sequentially (fast display)
+  async function loadNextTrailerData(list, index) {
+    if (index >= list.length) {
+      finishPlaylist();
+      return;
+    }
+
+    const movie = list[index];
+    try {
+      const vr = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`);
+      const vids = await vr.json();
+
+      const yt = vids.results.find(v => v.site === "YouTube" && /trailer/i.test(v.type)) ||
+                 vids.results.find(v => v.site === "YouTube");
+
+      if (yt) {
+        playlist.push({
+          youtubeId: yt.key,
+          title: movie.title || movie.name,
+          desc: movie.overview || ""
+        });
+
+        // If this is the FIRST trailer → show immediately
+        if (playlist.length === 1) {
+          renderDots();
+          loadAtIndex(0);
+        }
+      }
+    } catch {}
+
+    // Fetch next trailer immediately
+    loadNextTrailerData(list, index + 1);
+  }
+
+  function finishPlaylist() {
+    if (playlist.length === 0) {
+      titleEl.innerText = "No trailers available";
+      descEl.innerText = "Add manual trailers or configure TMDB.";
+      return;
+    }
+
+    renderDots();
+    loadAtIndex(0);
+  }
+
+  /* ---------------- YOUTUBE PLAYER ---------------- */
+  function loadYTAPI() {
+    return new Promise(res => {
+      if (window.YT && window.YT.Player) res();
+      else {
+        const s = document.createElement("script");
+        s.src = "https://www.youtube.com/iframe_api";
+        document.head.appendChild(s);
+        window.onYouTubeIframeAPIReady = res;
+      }
+    });
+  }
+
+  async function initPlayer() {
+    await loadYTAPI();
+    ytPlayer = new YT.Player(playerPlaceholder, {
+      height: "100%",
+      width: "100%",
+      videoId: playlist[currentIndex].youtubeId,
+      playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, mute: 1 },
+      events: {
+        onReady: ev => ev.target.playVideo(),
+        onStateChange: ev => { if (ev.data === 0) goNext(); }
+      }
+    });
+  }
+
+  async function loadAtIndex(i) {
+    if (playlist.length === 0) return;
+    currentIndex = (i + playlist.length) % playlist.length;
+
+    const t = playlist[currentIndex];
+    titleEl.innerText = t.title || "Trailer";
+    descEl.innerText = t.desc || "";
+
+    if (ytPlayer) {
+      ytPlayer.loadVideoById(t.youtubeId);
+      if (isMuted) ytPlayer.mute();
+    } else {
+      playerPlaceholder.innerHTML = "";
+      await initPlayer();
+    }
+
+    updateDots();
+  }
+
+  function goNext() { loadAtIndex(currentIndex + 1); }
+  function goPrev() { loadAtIndex(currentIndex - 1); }
+
+  muteBtn.onclick = () => {
+    isMuted = !isMuted;
+    if (ytPlayer) (isMuted ? ytPlayer.mute() : ytPlayer.unMute());
+    muteBtn.innerText = isMuted ? "Unmute" : "Mute";
+  };
+
+  nextBtn.onclick = goNext;
+  prevBtn.onclick = goPrev;
+
+  /* ---------------- DOTS UI ---------------- */
+  function renderDots() {
+    dotsWrap.innerHTML = "";
+    playlist.forEach((_, i) => {
+      const d = document.createElement("div");
+      d.className = "dot";
+      d.onclick = () => loadAtIndex(i);
+      dotsWrap.appendChild(d);
+    });
+    updateDots();
+  }
+
+  function updateDots() {
+    const dots = dotsWrap.querySelectorAll(".dot");
+    dots.forEach((d, i) => d.classList.toggle("active", i === currentIndex));
+  }
+
+  /* ---------------- START ---------------- */
+  buildPlaylist();
+
+});
+</script>
 
 
 
 </body>
 </html>
+
 
 
 
