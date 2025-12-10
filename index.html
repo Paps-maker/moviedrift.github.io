@@ -1274,28 +1274,24 @@ a.download-link:hover,
 
 <!-- TRAILER SHOWCASE -->
 <section id="trailerShowcase" class="trailer-showcase">
-
-  <!-- VIDEO PLAYER AREA -->
   <div class="trailer-player-wrap">
-      <div id="ytPlayerPlaceholder"></div>
-  </div>
+    <div id="ytPlayerPlaceholder"></div>
 
-  <!-- BOTTOM INFO BAR (Title Only) -->
-  <div class="trailer-info">
-      <div id="trailerTitle" class="trailer-title">Loading...</div>
-  </div>
+    <div class="trailer-overlay">
+      <div class="trailer-meta">
+        <div id="trailerTitle" class="trailer-title">Loading...</div>
+        <div id="trailerDesc" class="trailer-desc"></div>
+      </div>
 
-  <!-- CONTROLS + DOTS AREA -->
-  <div class="trailer-bottom-controls">
       <div class="trailer-controls">
-          <button id="prevTrailer" class="trailer-btn">Prev</button>
-          <button id="muteToggle" class="trailer-btn">Mute</button>
-          <button id="nextTrailer" class="trailer-btn">Next</button>
+        <button id="prevTrailer" class="trailer-btn">Prev</button>
+        <button id="muteToggle" class="trailer-btn">Mute</button>
+        <button id="nextTrailer" class="trailer-btn">Next</button>
       </div>
 
       <div id="trailerDots" class="trailer-dots"></div>
+    </div>
   </div>
-
 </section>
 
 <div class="toggle-buttons">
@@ -2425,6 +2421,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
