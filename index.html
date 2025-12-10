@@ -1064,159 +1064,143 @@ a.download-link:hover,
   }
 }
 
-/* ===============================
-   TRAILER SHOWCASE - DARK NEON PRO
-   =============================== */
-
+/* Trailer Showcase - Dark Neon style */
 .trailer-showcase {
   width: 100%;
-  background: linear-gradient(180deg, #000 0%, #020202 100%);
-  padding: 25px 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.9), rgba(0,0,0,0.95));
+  padding: 28px 0 40px;
+  box-sizing: border-box;
 }
 
-/* VIDEO WRAPPER */
+/* Player section */
 .trailer-player-wrap {
   width: 100%;
-  max-width: 1150px;
-  margin: auto;
-  position: relative;
+  max-width: 1100px;
+  margin: 0 auto;
   aspect-ratio: 16/7;
+  background: #000;
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid rgba(0,255,120,0.1);
-  background: #000;
-  box-shadow: 0 12px 50px rgba(0,255,120,0.08);
+  border: 1px solid rgba(0,255,120,0.08);
+  box-shadow: 0 12px 45px rgba(0,255,120,0.08);
 }
 
 #ytPlayerPlaceholder iframe {
   width: 100%;
   height: 100%;
-  border: none;
+  display: block;
+  border: 0;
 }
 
-/* ===============================
-   CLEAN MODERN OVERLAY (NO OVERLAP)
-   =============================== */
-
-.trailer-overlay {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 20px 22px;
-  background: linear-gradient(0deg, rgba(0,0,0,0.85), rgba(0,0,0,0.35));
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 18px;
-  box-sizing: border-box;
+/* Trailer information below player */
+.trailer-info {
+  max-width: 1100px;
+  margin: 14px auto 0;
+  padding: 0 10px;
+  text-align: left;
 }
 
-/* Text Area */
-.trailer-meta {
-  flex: 1;
-  min-width: 0;
-}
-
-/* TITLE — More space, bigger, readable */
 .trailer-title {
   color: var(--accent);
+  font-weight: 800;
   font-size: 22px;
-  font-weight: 900;
-  text-shadow: 0 0 6px rgba(0,255,120,0.35);
   margin-bottom: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* DESCRIPTION */
 .trailer-desc {
   color: var(--text);
   font-size: 14px;
-  line-height: 1.35;
-  max-height: 48px;
+  opacity: 0.9;
+  max-height: 46px;
   overflow: hidden;
-  opacity: 0.85;
+  line-height: 1.4;
+  font-weight: 500;
 }
 
-/* ===============================
-   CONTROLS
-   =============================== */
+/* Controls + dots section */
+.trailer-bottom-controls {
+  max-width: 1100px;
+  margin: 22px auto 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 10px;
+  flex-wrap: wrap;
+}
+
+/* Buttons */
 .trailer-controls {
   display: flex;
-  align-items: center;
   gap: 10px;
+  align-items: center;
 }
 
 .trailer-btn {
   background: linear-gradient(90deg,#00ff80,#00d5ff);
-  color: #000;
-  font-weight: 900;
-  padding: 10px 15px;
   border: none;
-  border-radius: 10px;
+  padding: 10px 15px;
+  font-weight: 800;
+  color: #000;
+  border-radius: 8px;
   cursor: pointer;
-  white-space: nowrap;
-  box-shadow: 0 6px 20px rgba(0,255,140,0.18);
-  transition: 0.15s ease;
+  font-size: 14px;
+  box-shadow: 0 6px 20px rgba(0,255,140,0.12);
+  transition: transform 0.2s ease;
 }
 
 .trailer-btn:hover {
   transform: translateY(-2px);
-  filter: brightness(1.15);
 }
 
-/* DOTS (Slide Indicators) */
+/* Dots indicator */
 .trailer-dots {
   display: flex;
   gap: 8px;
+  align-items: center;
+  margin-top: 12px;
 }
 
 .trailer-dots .dot {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.18);
+  transition: all .2s;
   cursor: pointer;
-  transition: 0.2s;
 }
 
 .trailer-dots .dot.active {
   background: var(--accent);
   transform: scale(1.3);
-  box-shadow: 0 0 10px rgba(0,255,120,0.4);
+  box-shadow: 0 0 12px rgba(0,255,120,0.25);
 }
 
-/* ===============================
-   RESPONSIVE
-   =============================== */
-
+/* Responsive */
 @media (max-width: 900px) {
-  .trailer-player-wrap {
-    aspect-ratio: 16/9;
-  }
+  .trailer-player-wrap { aspect-ratio: 16/9; }
 
   .trailer-title {
     font-size: 18px;
   }
 
   .trailer-desc {
-    font-size: 12px;
-    max-height: 38px;
+    font-size: 13px;
   }
 
-  .trailer-overlay {
-    padding: 16px;
+  .trailer-bottom-controls {
     flex-direction: column;
+    gap: 12px;
     align-items: flex-start;
   }
 
-  .trailer-controls {
-    width: 100%;
-    justify-content: space-between;
+  .trailer-dots {
+    margin-left: 0;
   }
 }
+
 
 </style>
 </head>
@@ -1275,25 +1259,31 @@ a.download-link:hover,
 
 <!-- TRAILER SHOWCASE -->
 <section id="trailerShowcase" class="trailer-showcase">
+
+  <!-- VIDEO PLAYER AREA -->
   <div class="trailer-player-wrap">
-    <div id="ytPlayerPlaceholder"></div>
+      <div id="ytPlayerPlaceholder"></div>
+  </div>
 
-    <div class="trailer-overlay">
-      <div class="trailer-meta">
-        <div id="trailerTitle" class="trailer-title">Loading...</div>
-        <div id="trailerDesc" class="trailer-desc"></div>
-      </div>
+  <!-- BOTTOM INFO BAR (Title + Description) -->
+  <div class="trailer-info">
+      <div id="trailerTitle" class="trailer-title">Loading...</div>
+      <div id="trailerDesc" class="trailer-desc"></div>
+  </div>
 
+  <!-- CONTROLS + DOTS AREA -->
+  <div class="trailer-bottom-controls">
       <div class="trailer-controls">
-        <button id="prevTrailer" class="trailer-btn">Prev</button>
-        <button id="muteToggle" class="trailer-btn">Mute</button>
-        <button id="nextTrailer" class="trailer-btn">Next</button>
+          <button id="prevTrailer" class="trailer-btn">Prev</button>
+          <button id="muteToggle" class="trailer-btn">Mute</button>
+          <button id="nextTrailer" class="trailer-btn">Next</button>
       </div>
 
       <div id="trailerDots" class="trailer-dots"></div>
-    </div>
   </div>
+
 </section>
+
 <div class="toggle-buttons">
  
 </div>
@@ -2421,6 +2411,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
