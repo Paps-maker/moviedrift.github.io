@@ -1092,128 +1092,93 @@ a.download-link:hover,
   border: 0;
 }
 
-/* Trailer information below player */
-.trailer-info {
-  max-width: 1100px;
-  margin: 14px auto 0;
-  padding: 0 10px;
-  text-align: left;
+/* Trailer Showcase - Dark Neon style */
+.trailer-showcase {
+  width: 100%;
+  background: linear-gradient(180deg, rgba(0,0,0,0.9), rgba(0,0,0,0.95));
+  padding: 18px 0;
+  box-sizing: border-box;
 }
 
+.trailer-player-wrap {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  position: relative;
+  aspect-ratio: 16/7;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(0,255,120,0.08);
+  box-shadow: 0 10px 40px rgba(0,255,120,0.06);
+}
+
+/* iframe container */
+#ytPlayerPlaceholder iframe { width:100%; height:100%; display:block; border:0; }
+
+/* overlay */
+.trailer-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.75), rgba(0,0,0,0.25));
+  box-sizing: border-box;
+}
+
+.trailer-meta { flex: 1 1 auto; min-width:0; }
 .trailer-title {
   color: var(--accent);
   font-weight: 800;
-  font-size: 22px;
+  font-size: 18px;
   margin-bottom: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .trailer-desc {
   color: var(--text);
-  font-size: 14px;
+  font-size: 13px;
   opacity: 0.9;
-  max-height: 46px;
+  max-height: 40px;
   overflow: hidden;
-  line-height: 1.4;
   font-weight: 500;
 }
 
-/* Controls + dots section */
-.trailer-bottom-controls {
-  max-width: 1100px;
-  margin: 22px auto 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 10px;
-  flex-wrap: wrap;
-}
-
-/* Buttons */
-.trailer-controls {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
+/* controls */
+.trailer-controls { display:flex; gap:8px; align-items:center; }
 .trailer-btn {
   background: linear-gradient(90deg,#00ff80,#00d5ff);
   border: none;
-  padding: 10px 15px;
+  padding: 8px 12px;
   font-weight: 800;
   color: #000;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
-  box-shadow: 0 6px 20px rgba(0,255,140,0.12);
-  transition: transform 0.2s ease;
+  box-shadow: 0 6px 18px rgba(0,255,140,0.12);
 }
-
-.trailer-btn:hover {
-  transform: translateY(-2px);
-}
+.trailer-btn:hover { transform: translateY(-2px); }
 
 /* dots */
-.trailer-dots {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-
+.trailer-dots { display:flex; gap:6px; margin-left: 12px; }
 .trailer-dots .dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+  width: 10px; height: 10px; border-radius:50%;
   background: rgba(255,255,255,0.18);
   transition: all .2s;
   cursor: pointer;
 }
+.trailer-dots .dot.active { background: var(--accent); transform: scale(1.25); box-shadow: 0 0 8px rgba(0,255,120,0.2); }
 
-.trailer-dots .dot.active {
-  background: var(--accent);
-  transform: scale(1.4);
-  box-shadow: 0 0 6px rgba(0,255,120,0.25);
-}
-
-/* MOBILE DOTS FIX */
-@media (max-width: 600px) {
-  .trailer-dots {
-    gap: 4px;
-    justify-content: center;
-    margin-top: 8px;
-  }
-
-  .trailer-dots .dot {
-    width: 6px;
-    height: 6px;
-  }
-}
-
-/* Responsive */
+/* responsive */
 @media (max-width: 900px) {
   .trailer-player-wrap { aspect-ratio: 16/9; }
-
-  .trailer-title {
-    font-size: 18px;
-  }
-
-  .trailer-desc {
-    font-size: 13px;
-  }
-
-  .trailer-bottom-controls {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
-  }
-
-  .trailer-dots {
-    margin-left: 0;
-  }
+  .trailer-title { font-size: 16px; }
+  .trailer-desc { font-size: 12px; }
 }
 
 
@@ -2421,6 +2386,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
