@@ -1109,17 +1109,19 @@ a.download-link:hover,
   font-weight: 800;
   font-size: 18px;
   margin-bottom: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal; /* allow wrapping */
+  overflow: visible;   /* show full title */
+  text-overflow: unset;
+  line-height: 1.2;
 }
 .trailer-desc {
   color: var(--text);
   font-size: 13px;
   opacity: 0.9;
-  max-height: 40px;
+  max-height: 50px;
   overflow: hidden;
   font-weight: 500;
+  white-space: normal; /* allow wrapping */
 }
 
 /* controls */
@@ -1149,7 +1151,7 @@ a.download-link:hover,
 /* responsive */
 @media (max-width: 900px) {
   .trailer-player-wrap { aspect-ratio: 16/9; }
-  .trailer-title { font-size: 16px; }
+  .trailer-title { font-size: 16px; white-space: normal; } /* wrap long titles */
   .trailer-desc { font-size: 12px; }
 }
 
@@ -2356,6 +2358,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
