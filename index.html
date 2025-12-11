@@ -2207,7 +2207,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const manualTrailers = [];
 
   const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
-  const tmdbMode = "now_playing",
+  const tmdbMode =  [
+  "now_playing",
+  "upcoming",
+  "popular",
+  "top_rated"
+];
   const movieIds = [];
   const tmdbLimit = 100; // gets MANY new trailers automatically
 
@@ -2459,6 +2464,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
