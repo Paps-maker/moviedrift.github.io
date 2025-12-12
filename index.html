@@ -2199,17 +2199,10 @@ window.addEventListener("scroll", () => {
 document.getElementById("backToTop").addEventListener("click", () => {
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
-/* ---------------- TRAILER SHOWCASE (Firestore Live + Manual + TMDB + Shuffle + Countdown) ---------------- */
+/* ---------------- TRAILER SHOWCASE (LIVE FIRESTORE + Countdown + Shuffle) ---------------- */
 import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 document.addEventListener("DOMContentLoaded", () => {
-
-  /* ---------------- CONFIG ---------------- */
-  const manualTrailers = []; // optional manual trailers
-  const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
-  const tmdbMode = "now_playing";
-  const movieIds = [];
-  const tmdbLimit = 100;
 
   /* ---------------- FIRESTORE ---------------- */
   const db = getFirestore();
@@ -2231,16 +2224,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   /* Countdown */
   let countdownTimer = null;
-  let countdownSeconds = 5;
-
-  /* ---------------- SEARCH HIDE TRAILERS ---------------- */
-  const searchInput = document.getElementById("searchInput");
-  const trailerSection = document.getElementById("trailerShowcase");
-  if (searchInput && trailerSection) {
-    searchInput.addEventListener("input", () => {
-      trailerSection.style.display = searchInput.value.trim().length > 0 ? "none" : "block";
-    });
-  }
+  const countdownSeconds = 5;
 
   /* ---------------- UTIL ---------------- */
   function extractYouTubeId(url) {
@@ -2255,94 +2239,31 @@ document.addEventListener("DOMContentLoaded", () => {
     return m ? m[0] : null;
   }
 
-  /* ---------------- BUILD PLAYLIST ---------------- */
-  async function buildPlaylist() {
-    playlist = [];
-
-    // 1️⃣ Manual trailers
-    manualTrailers.forEach(t => {
-      const id = extractYouTubeId(t.youtube);
-      if (id) playlist.push({ youtubeId: id, title: t.title, desc: t.desc });
-    });
-
-    // 2️⃣ TMDB trailers
-    if (TMDB_API_KEY) {
-      try {
-        let movieList = [];
-        if (movieIds.length > 0) movieList = movieIds.map(id => ({ id }));
-        else {
-          const r = await fetch(`https://api.themoviedb.org/3/movie/${tmdbMode}?api_key=${TMDB_API_KEY}&language=en-US`);
-          const json = await r.json();
-          movieList = json.results.slice(0, tmdbLimit);
-        }
-        loadNextTrailerData(movieList, 0);
-      } catch (e) {
-        console.warn("TMDB error", e);
-        finishPlaylist();
-      }
-    } else {
-      finishPlaylist();
-    }
-  }
-
-  /* ---------------- TMDB FETCH SEQUENTIAL ---------------- */
-  async function loadNextTrailerData(list, index) {
-    if (index >= list.length) { finishPlaylist(); return; }
-    const movie = list[index];
-
-    try {
-      const r = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`);
-      const json = await r.json();
-      const vid = json.results.find(v => v.site === "YouTube" && /trailer/i.test(v.type)) ||
-                  json.results.find(v => v.site === "YouTube");
-
-      if (vid) {
-        playlist.push({ youtubeId: vid.key, title: movie.title, desc: movie.overview });
-        if (playlist.length === 1) { renderDots(); loadAtIndex(0); }
-      }
-    } catch {}
-
-    loadNextTrailerData(list, index + 1);
-  }
-
   /* ---------------- FIRESTORE REAL-TIME LISTENER ---------------- */
   onSnapshot(moviesRef, snapshot => {
-    snapshot.docChanges().forEach(change => {
-      const movie = change.doc.data();
-      const ytId = extractYouTubeId(movie.trailer);
+    playlist = []; // clear current playlist
 
+    snapshot.docs.forEach(doc => {
+      const movie = doc.data();
+      const ytId = extractYouTubeId(movie.trailer);
       if (!ytId) return;
 
-      if (change.type === "added") {
-        // Add new trailer at the beginning
-        playlist.unshift({ youtubeId: ytId, title: movie.title, desc: movie.description });
-        renderDots();
-        loadAtIndex(0);
-      } else if (change.type === "modified") {
-        // Update existing trailer
-        const index = playlist.findIndex(t => t.title === movie.title);
-        if (index !== -1) playlist[index] = { youtubeId: ytId, title: movie.title, desc: movie.description };
-        renderDots();
-      } else if (change.type === "removed") {
-        const index = playlist.findIndex(t => t.title === movie.title);
-        if (index !== -1) playlist.splice(index, 1);
-        if (currentIndex >= playlist.length) currentIndex = 0;
-        renderDots();
-        loadAtIndex(currentIndex);
-      }
+      playlist.push({
+        youtubeId: ytId,
+        title: movie.title || "Untitled",
+        desc: movie.description || ""
+      });
     });
-  });
 
-  /* ---------------- PLAYLIST RENDER ---------------- */
-  function finishPlaylist() {
     if (playlist.length === 0) {
       titleEl.innerText = "No trailers available";
-      descEl.innerText = "Add trailers to Firestore, manual, or configure TMDB.";
-      return;
+      descEl.innerText = "Add movies in the Movies form above.";
+      playerPlaceholder.innerHTML = "";
+    } else {
+      renderDots();
+      loadAtIndex(0);
     }
-    renderDots();
-    loadAtIndex(0);
-  }
+  });
 
   /* ---------------- YOUTUBE PLAYER ---------------- */
   function loadYTAPI() {
@@ -2379,8 +2300,13 @@ document.addEventListener("DOMContentLoaded", () => {
     titleEl.innerText = t.title;
     descEl.innerText = t.desc;
 
-    if (ytPlayer) { ytPlayer.loadVideoById(t.youtubeId); if (isMuted) ytPlayer.mute(); }
-    else { playerPlaceholder.innerHTML = ""; await initPlayer(); }
+    if (ytPlayer) { 
+      ytPlayer.loadVideoById(t.youtubeId);
+      if (isMuted) ytPlayer.mute();
+    } else {
+      playerPlaceholder.innerHTML = "";
+      await initPlayer();
+    }
 
     updateDots();
   }
@@ -2395,7 +2321,12 @@ document.addEventListener("DOMContentLoaded", () => {
   /* ---------------- DOTS ---------------- */
   function renderDots() {
     dotsWrap.innerHTML = "";
-    playlist.forEach((_, i) => { const d = document.createElement("div"); d.className = "dot"; d.onclick = () => loadAtIndex(i); dotsWrap.appendChild(d); });
+    playlist.forEach((_, i) => {
+      const d = document.createElement("div");
+      d.className = "dot";
+      d.onclick = () => loadAtIndex(i);
+      dotsWrap.appendChild(d);
+    });
     updateDots();
   }
   function updateDots() { dotsWrap.querySelectorAll(".dot").forEach((d, i) => d.classList.toggle("active", i === currentIndex)); }
@@ -2403,7 +2334,10 @@ document.addEventListener("DOMContentLoaded", () => {
   /* ---------------- SHUFFLE ---------------- */
   function shufflePlaylist() {
     stopCountdown();
-    for (let i = playlist.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [playlist[i], playlist[j]] = [playlist[j], playlist[i]]; }
+    for (let i = playlist.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [playlist[i], playlist[j]] = [playlist[j], playlist[i]];
+    }
     renderDots(); loadAtIndex(0);
   }
   const shuffleBtn = document.createElement("button");
@@ -2417,16 +2351,15 @@ document.addEventListener("DOMContentLoaded", () => {
   function startCountdown() {
     let timeLeft = countdownSeconds;
     titleEl.innerText = playlist[currentIndex].title + ` (Next in ${timeLeft}s)`;
+
     countdownTimer = setInterval(() => {
       timeLeft--;
       titleEl.innerText = playlist[currentIndex].title + ` (Next in ${timeLeft}s)`;
+
       if (timeLeft <= 0) { stopCountdown(); goNext(); }
     }, 1000);
   }
   function stopCountdown() { if (countdownTimer) clearInterval(countdownTimer); countdownTimer = null; }
-
-  /* ---------------- START ---------------- */
-  buildPlaylist();
 
 });
 
@@ -2436,6 +2369,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
