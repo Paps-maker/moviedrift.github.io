@@ -2200,18 +2200,16 @@ document.getElementById("backToTop").addEventListener("click", () => {
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
-/* ---------------- TRAILER SHOWCASE (manual + TMDB) ---------------- */
+/* ---------------- TRAILER SHOWCASE (manual + TMDB + Shuffle + Countdown) ---------------- */
 document.addEventListener("DOMContentLoaded", () => {
 
   /* ---------------- CONFIG ---------------- */
-  const manualTrailers = [
-    // add manual trailers here if you want
-  ];
+  const manualTrailers = [];
 
   const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
   const tmdbMode = "now_playing";
   const movieIds = [];
-  const tmdbLimit = 60;
+  const tmdbLimit = 100; // gets MANY new trailers automatically
 
   /* ---------------- INTERNAL ---------------- */
   const playerPlaceholder = document.getElementById("ytPlayerPlaceholder");
@@ -2227,14 +2225,17 @@ document.addEventListener("DOMContentLoaded", () => {
   let ytPlayer = null;
   let isMuted = true;
 
+  /* Countdown */
+  let countdownTimer = null;
+  let countdownSeconds = 5;
+
   /* ---------------- SEARCH HIDE TRAILERS ---------------- */
   const searchInput = document.getElementById("searchInput");
   const trailerSection = document.getElementById("trailerShowcase");
 
   if (searchInput && trailerSection) {
     searchInput.addEventListener("input", () => {
-      const q = searchInput.value.trim();
-      trailerSection.style.display = q.length > 0 ? "none" : "block";
+      trailerSection.style.display = searchInput.value.trim().length > 0 ? "none" : "block";
     });
   }
 
@@ -2251,15 +2252,13 @@ document.addEventListener("DOMContentLoaded", () => {
     return m ? m[0] : null;
   }
 
-  /* ---------------- FAST TMDB FETCH (LOAD ONE BY ONE) ---------------- */
+  /* ---------------- BUILD PLAYLIST (FAST LOADING) ---------------- */
   async function buildPlaylist() {
-    // Add manual first:
     manualTrailers.forEach(t => {
       const id = extractYouTubeId(t.youtube);
       if (id) playlist.push({ youtubeId: id, title: t.title, desc: t.desc });
     });
 
-    // TMDB fetch
     if (TMDB_API_KEY) {
       try {
         let movieList = [];
@@ -2272,7 +2271,6 @@ document.addEventListener("DOMContentLoaded", () => {
           movieList = json.results.slice(0, tmdbLimit);
         }
 
-        // **Load trailers one-by-one fast**
         loadNextTrailerData(movieList, 0);
 
       } catch (e) {
@@ -2283,7 +2281,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // fetch trailers sequentially (fast display)
   async function loadNextTrailerData(list, index) {
     if (index >= list.length) {
       finishPlaylist();
@@ -2291,21 +2288,22 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const movie = list[index];
+
     try {
-      const vr = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`);
-      const vids = await vr.json();
+      const r = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`);
+      const json = await r.json();
 
-      const yt = vids.results.find(v => v.site === "YouTube" && /trailer/i.test(v.type)) ||
-                 vids.results.find(v => v.site === "YouTube");
+      const vid =
+        json.results.find(v => v.site === "YouTube" && /trailer/i.test(v.type)) ||
+        json.results.find(v => v.site === "YouTube");
 
-      if (yt) {
+      if (vid) {
         playlist.push({
-          youtubeId: yt.key,
+          youtubeId: vid.key,
           title: movie.title || movie.name,
           desc: movie.overview || ""
         });
 
-        // If this is the FIRST trailer → show immediately
         if (playlist.length === 1) {
           renderDots();
           loadAtIndex(0);
@@ -2313,7 +2311,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch {}
 
-    // Fetch next trailer immediately
     loadNextTrailerData(list, index + 1);
   }
 
@@ -2344,24 +2341,28 @@ document.addEventListener("DOMContentLoaded", () => {
   async function initPlayer() {
     await loadYTAPI();
     ytPlayer = new YT.Player(playerPlaceholder, {
-      height: "100%",
-      width: "100%",
+      height: "100%", width: "100%",
       videoId: playlist[currentIndex].youtubeId,
       playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, mute: 1 },
       events: {
         onReady: ev => ev.target.playVideo(),
-        onStateChange: ev => { if (ev.data === 0) goNext(); }
+        onStateChange: ev => {
+          if (ev.data === 0) startCountdown();
+        }
       }
     });
   }
 
+  /* ---------------- LOAD NEW TRAILER ---------------- */
   async function loadAtIndex(i) {
+    stopCountdown();
+
     if (playlist.length === 0) return;
     currentIndex = (i + playlist.length) % playlist.length;
 
     const t = playlist[currentIndex];
-    titleEl.innerText = t.title || "Trailer";
-    descEl.innerText = t.desc || "";
+    titleEl.innerText = t.title;
+    descEl.innerText = t.desc;
 
     if (ytPlayer) {
       ytPlayer.loadVideoById(t.youtubeId);
@@ -2374,8 +2375,8 @@ document.addEventListener("DOMContentLoaded", () => {
     updateDots();
   }
 
-  function goNext() { loadAtIndex(currentIndex + 1); }
-  function goPrev() { loadAtIndex(currentIndex - 1); }
+  function goNext() { stopCountdown(); loadAtIndex(currentIndex + 1); }
+  function goPrev() { stopCountdown(); loadAtIndex(currentIndex - 1); }
 
   muteBtn.onclick = () => {
     isMuted = !isMuted;
@@ -2386,7 +2387,7 @@ document.addEventListener("DOMContentLoaded", () => {
   nextBtn.onclick = goNext;
   prevBtn.onclick = goPrev;
 
-  /* ---------------- DOTS UI ---------------- */
+  /* ---------------- DOTS ---------------- */
   function renderDots() {
     dotsWrap.innerHTML = "";
     playlist.forEach((_, i) => {
@@ -2403,9 +2404,49 @@ document.addEventListener("DOMContentLoaded", () => {
     dots.forEach((d, i) => d.classList.toggle("active", i === currentIndex));
   }
 
-  /* -----------------------------------------------------------
-     NEW FUNCTION: Add Manual Trailer to Playlist Instantly
-  ------------------------------------------------------------ */
+  /* ---------------- SHUFFLE FEATURE ---------------- */
+  function shufflePlaylist() {
+    stopCountdown();
+
+    for (let i = playlist.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [playlist[i], playlist[j]] = [playlist[j], playlist[i]];
+    }
+
+    renderDots();
+    loadAtIndex(0);
+  }
+
+  const shuffleBtn = document.createElement("button");
+  shuffleBtn.innerText = "Shuffle";
+  shuffleBtn.className = "trailer-btn";
+  shuffleBtn.style.marginLeft = "10px";
+  shuffleBtn.onclick = shufflePlaylist;
+  document.querySelector(".trailer-controls").appendChild(shuffleBtn);
+
+  /* ---------------- NEXT TRAILER COUNTDOWN ---------------- */
+  function startCountdown() {
+    let timeLeft = countdownSeconds;
+
+    titleEl.innerText = playlist[currentIndex].title + ` (Next in ${timeLeft}s)`;
+
+    countdownTimer = setInterval(() => {
+      timeLeft--;
+      titleEl.innerText = playlist[currentIndex].title + ` (Next in ${timeLeft}s)`;
+
+      if (timeLeft <= 0) {
+        stopCountdown();
+        goNext();
+      }
+    }, 1000);
+  }
+
+  function stopCountdown() {
+    if (countdownTimer) clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
+
+  /* ======== ADD NEW MANUAL MOVIE TO PLAYLIST ======== */
   function updateTrailerPlaylist(movie) {
     playlist.unshift({
       youtubeId: extractYouTubeId(movie.trailer),
@@ -2428,6 +2469,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
