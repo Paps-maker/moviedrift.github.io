@@ -1963,22 +1963,20 @@ window.removeFromWatchlist=function(i){watchlist.splice(i,1);localStorage.setIte
 const searchInput = document.getElementById("search");
 const trailerSection = document.getElementById("trailerShowcase"); // your trailer container
 const posterSection = document.getElementById("posterShowcase");   // your poster container
-const genreFilter = document.getElementById("genreFilter");
-const yearFilter = document.getElementById("yearFilter");
 
 function handleSearchAndFilter() {
   renderMovies(); // your existing render
 
+  // Hide trailer section if search or filters have a value
   const hasSearch = searchInput.value.trim().length > 0;
   const hasGenre = genreFilter.value !== "";
   const hasYear = yearFilter.value !== "";
   const hasType = document.getElementById("typeFilter").value !== "";
 
-  // Hide trailer & poster sections if search or filters have a value
-  const hideSections = hasSearch || hasGenre || hasYear || hasType;
-
-  trailerSection.style.display = hideSections ? "none" : "block";
-  posterSection.style.display = hideSections ? "none" : "block";
+  trailerSection.style.display = (hasSearch || hasGenre || hasYear || hasType) ? "none" : "block";
+  
+  // Hide poster section exactly the same way
+  posterSection.style.display = (hasSearch || hasGenre || hasYear || hasType) ? "none" : "block";
 }
 
 // Attach to search and filters
@@ -2601,6 +2599,7 @@ rightArrow.onclick = () => {
 
 </body>
 </html>
+
 
 
 
