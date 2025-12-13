@@ -1207,11 +1207,10 @@ a.download-link:hover,
   .trailer-title { font-size: 16px; }
   .trailer-desc { font-size: 12px; }
 }
-
 /* ---------------- Poster Showcase ---------------- */
 .poster-showcase {
   padding: 20px;
-  background-color: #0a0a0a; /* Dark background to match trailer section */
+  background-color: #0a0a0a;
   color: #00ff66;
 }
 
@@ -1222,12 +1221,18 @@ a.download-link:hover,
   text-align: left;
 }
 
+/* Wrapper for arrows + grid */
+.poster-wrapper {
+  position: relative;
+}
+
 .poster-grid {
   display: flex;
-  flex-wrap: nowrap; /* horizontal scroll */
+  flex-wrap: nowrap;
   overflow-x: auto;
   gap: 10px;
-  padding-bottom: 10px;
+  padding: 0 40px; /* space for arrows */
+  scroll-behavior: smooth;
 }
 
 .poster-grid::-webkit-scrollbar {
@@ -1273,6 +1278,29 @@ a.download-link:hover,
 .poster-card:hover {
   transform: scale(1.05);
   box-shadow: 0 4px 15px rgba(0, 255, 102, 0.4);
+}
+
+/* Arrows */
+.poster-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 60px;
+  background-color: rgba(0,0,0,0.6);
+  border: none;
+  color: #00ff66;
+  font-size: 2rem;
+  cursor: pointer;
+  z-index: 10;
+  border-radius: 4px;
+}
+
+.left-arrow { left: 5px; }
+.right-arrow { right: 5px; }
+
+.poster-arrow:hover {
+  background-color: rgba(0,0,0,0.9);
 }
 
 /* Responsive adjustments */
@@ -1339,13 +1367,18 @@ a.download-link:hover,
   </div>
    
 </header>
-<!-- ================= Poster Showcase ================= -->
+<!-- ================= Poster Showcase with Arrows ================= -->
 <section id="posterShowcase" class="poster-showcase">
-  <h2 class="poster-title">Trending Posters</h2>
-  <div id="posterGrid" class="poster-grid">
-    <!-- Poster cards will be injected here via JS -->
+  <h2 class="poster-title">Trending</h2>
+  <div class="poster-wrapper">
+    <button class="poster-arrow left-arrow">&#10094;</button>
+    <div id="posterGrid" class="poster-grid">
+      <!-- Poster cards injected by JS -->
+    </div>
+    <button class="poster-arrow right-arrow">&#10095;</button>
   </div>
 </section>
+
 
 <!-- TRAILER SHOWCASE -->
 <section id="trailerShowcase" class="trailer-showcase">
@@ -2546,6 +2579,20 @@ document.addEventListener("DOMContentLoaded", () => {
   buildPlaylist();
 
 });
+// Poster scroll arrows
+const posterGridEl = document.getElementById("posterGrid");
+const leftArrow = document.querySelector(".left-arrow");
+const rightArrow = document.querySelector(".right-arrow");
+
+const scrollAmount = 300; // Adjust scroll distance per click
+
+leftArrow.onclick = () => {
+  posterGridEl.scrollBy({ left: -scrollAmount, behavior: "smooth" });
+};
+
+rightArrow.onclick = () => {
+  posterGridEl.scrollBy({ left: scrollAmount, behavior: "smooth" });
+};
 
 </script>
 
@@ -2553,6 +2600,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
