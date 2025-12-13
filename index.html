@@ -2463,10 +2463,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const card = document.createElement("div");
         card.className = "poster-card";
         card.innerHTML = `
-          <img src="https://image.tmdb.org/t/p/w500${item.poster_path}" alt="${item.title || item.name}">
-          <div class="poster-info">
-            ${item.title || item.name} <span class="media-label">${mediaLabel}</span>
+          <div class="poster-image-wrapper">
+            <img src="https://image.tmdb.org/t/p/w500${item.poster_path}" alt="${item.title || item.name}">
+            <span class="media-label ${mediaLabel}">${mediaLabel}</span>
           </div>
+          <div class="poster-info">${item.title || item.name}</div>
         `;
 
         card.onclick = () => {
@@ -2611,15 +2612,33 @@ rightArrow.onclick = () => posterGridEl.scrollBy({ left: scrollAmount, behavior:
 /* ---------------- CSS FOR MEDIA LABELS ---------------- */
 const style = document.createElement("style");
 style.innerHTML = `
-  .media-label {
+  .poster-image-wrapper {
+    position: relative;
     display: inline-block;
-    background: #00ff66;
-    color: #000;
+  }
+  .media-label {
+    position: absolute;
+    top: 8px;
+    left: 8px;
     font-size: 0.7rem;
     font-weight: bold;
     padding: 2px 6px;
     border-radius: 4px;
-    margin-left: 5px;
+    color: #000;
+    z-index: 10;
+  }
+  .media-label.Movie { background-color: #00ff66; }   /* Green */
+  .media-label.Series { background-color: #3399ff; }  /* Blue */
+  .media-label.Animation { background-color: #ffcc00; } /* Yellow */
+  .poster-card img {
+    width: 100%;
+    display: block;
+    border-radius: 6px;
+  }
+  .poster-info {
+    margin-top: 5px;
+    text-align: center;
+    font-weight: bold;
   }
 `;
 document.head.appendChild(style);
@@ -2631,6 +2650,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
