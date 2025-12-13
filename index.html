@@ -2378,31 +2378,31 @@ document.addEventListener("DOMContentLoaded", () => {
   async function buildPlaylist() {
     manualTrailers.forEach(t => {
       const id = extractYouTubeId(t.youtube);
-      if (id) playlist.push({ youtubeId: id, title: t.title, desc: t.desc });
+      if (id) playlist.push({ youtubeId: id, title: t.title, desc: t.desc, label: t.label || "Manual" });
     });
 
     if (TMDB_API_KEY) {
       try {
         let movieList = [];
+
         if (movieIds.length > 0) {
-          movieList = movieIds.map(id => ({ id }));
+          movieList = movieIds.map(id => ({ id, label: "Movie" }));
         } else {
-          // Fetch movies
-          const movieRes = await fetch(`https://api.themoviedb.org/3/movie/${tmdbMode}?api_key=${TMDB_API_KEY}&language=en-US`);
-          const movieJson = await movieRes.json();
-          const movies = movieJson.results.slice(0, tmdbLimit);
+          // Movies
+          const r = await fetch(`https://api.themoviedb.org/3/movie/${tmdbMode}?api_key=${TMDB_API_KEY}&language=en-US`);
+          const json = await r.json();
+          const movies = json.results.slice(0, tmdbLimit).map(m => ({ ...m, label: "Movie" }));
 
-          // Fetch TV series
-          const seriesRes = await fetch(`https://api.themoviedb.org/3/tv/${tmdbMode}?api_key=${TMDB_API_KEY}&language=en-US`);
-          const seriesJson = await seriesRes.json();
-          const series = seriesJson.results.slice(0, tmdbLimit);
+          // Series
+          const sRes = await fetch(`https://api.themoviedb.org/3/tv/${tmdbMode}?api_key=${TMDB_API_KEY}&language=en-US`);
+          const sJson = await sRes.json();
+          const series = sJson.results.slice(0, tmdbLimit).map(s => ({ ...s, label: "Series" }));
 
-          // Fetch animation movies
-          const animationRes = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=16&language=en-US&sort_by=popularity.desc`);
-          const animationJson = await animationRes.json();
-          const animations = animationJson.results.slice(0, tmdbLimit);
+          // Animation Movies
+          const aRes = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=16&language=en-US&sort_by=popularity.desc`);
+          const aJson = await aRes.json();
+          const animations = aJson.results.slice(0, tmdbLimit).map(a => ({ ...a, label: "Animation" }));
 
-          // Combine all
           movieList = [...movies, ...series, ...animations];
         }
 
@@ -2420,10 +2420,10 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadNextTrailerData(list, index) {
     if (index >= list.length) { finishPlaylist(); return; }
 
-    const item = list[index];
+    const movie = list[index];
     try {
-      const type = item.title ? "movie" : "tv"; // detect type
-      const r = await fetch(`https://api.themoviedb.org/3/${type}/${item.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`);
+      const type = movie.label === "Series" ? "tv" : "movie";
+      const r = await fetch(`https://api.themoviedb.org/3/${type}/${movie.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`);
       const json = await r.json();
 
       const vid =
@@ -2431,7 +2431,12 @@ document.addEventListener("DOMContentLoaded", () => {
         json.results.find(v => v.site === "YouTube");
 
       if (vid) {
-        playlist.push({ youtubeId: vid.key, title: item.title || item.name, desc: item.overview || "" });
+        playlist.push({
+          youtubeId: vid.key,
+          title: movie.title || movie.name,
+          desc: movie.overview || "",
+          label: movie.label
+        });
         if (playlist.length === 1) { renderDots(); loadAtIndex(0); }
       }
     } catch {}
@@ -2459,19 +2464,12 @@ document.addEventListener("DOMContentLoaded", () => {
       data.results.forEach(item => {
         if (!item.poster_path) return;
 
-        // Determine type label
-        let label = "";
-        if (item.media_type === "tv") label = "📺 Series";
-        else if (item.genre_ids && item.genre_ids.includes(16)) label = "🎬 Animation";
-
         const card = document.createElement("div");
         card.className = "poster-card";
+        const label = item.title ? "Movie" : "Series";
         card.innerHTML = `
           <img src="https://image.tmdb.org/t/p/w500${item.poster_path}" alt="${item.title || item.name}">
-          <div class="poster-info">
-            ${item.title || item.name}
-            ${label ? `<div class="poster-label">${label}</div>` : ""}
-          </div>
+          <div class="poster-info">${item.title || item.name} (${label})</div>
         `;
 
         card.onclick = () => {
@@ -2484,7 +2482,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 const vid = json.results.find(v => v.site === "YouTube" && /trailer/i.test(v.type)) ||
                             json.results.find(v => v.site === "YouTube");
                 if (vid) {
-                  playlist.unshift({ youtubeId: vid.key, title: item.title || item.name, desc: item.overview || "" });
+                  playlist.unshift({
+                    youtubeId: vid.key,
+                    title: item.title || item.name,
+                    desc: item.overview || "",
+                    label: label
+                  });
                   renderDots();
                   loadAtIndex(0);
                 }
@@ -2531,7 +2534,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (playlist.length === 0) return;
     currentIndex = (i + playlist.length) % playlist.length;
     const t = playlist[currentIndex];
-    titleEl.innerText = t.title;
+    titleEl.innerText = `${t.title} (${t.label})`;
     descEl.innerText = t.desc;
 
     if (ytPlayer) {
@@ -2600,7 +2603,8 @@ document.addEventListener("DOMContentLoaded", () => {
     playlist.unshift({
       youtubeId: extractYouTubeId(movie.trailer),
       title: movie.title,
-      desc: movie.description
+      desc: movie.description,
+      label: movie.label || "Manual"
     });
     renderDots();
     loadAtIndex(0);
@@ -2617,6 +2621,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
