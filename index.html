@@ -2378,21 +2378,28 @@ document.addEventListener("DOMContentLoaded", () => {
   async function buildPlaylist() {
     manualTrailers.forEach(t => {
       const id = extractYouTubeId(t.youtube);
-      if (id) playlist.push({ youtubeId: id, title: t.title, desc: t.desc });
+      if (id) playlist.push({ youtubeId: id, title: t.title, desc: t.desc, mediaType: t.mediaType || "Movie" });
     });
 
     if (TMDB_API_KEY) {
       try {
-        let movieList = [];
+        let mediaList = [];
         if (movieIds.length > 0) {
-          movieList = movieIds.map(id => ({ id }));
+          mediaList = movieIds.map(id => ({ id, mediaType: "movie" }));
         } else {
-          const r = await fetch(`https://api.themoviedb.org/3/movie/${tmdbMode}?api_key=${TMDB_API_KEY}&language=en-US`);
-          const json = await r.json();
-          movieList = json.results.slice(0, tmdbLimit);
+          // Fetch movies and TV shows
+          const movieR = await fetch(`https://api.themoviedb.org/3/movie/${tmdbMode}?api_key=${TMDB_API_KEY}&language=en-US`);
+          const movieJson = await movieR.json();
+          const tvR = await fetch(`https://api.themoviedb.org/3/tv/on_the_air?api_key=${TMDB_API_KEY}&language=en-US`);
+          const tvJson = await tvR.json();
+
+          mediaList = [
+            ...movieJson.results.map(m => ({ ...m, mediaType: "Movie" })),
+            ...tvJson.results.map(t => ({ ...t, mediaType: "Series" }))
+          ].slice(0, tmdbLimit);
         }
 
-        loadNextTrailerData(movieList, 0);
+        loadNextTrailerData(mediaList, 0);
         fetchPosters(); // fetch posters in parallel
 
       } catch (e) {
@@ -2406,9 +2413,10 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadNextTrailerData(list, index) {
     if (index >= list.length) { finishPlaylist(); return; }
 
-    const movie = list[index];
+    const item = list[index];
     try {
-      const r = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`);
+      const type = item.mediaType === "Series" ? "tv" : "movie";
+      const r = await fetch(`https://api.themoviedb.org/3/${type}/${item.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`);
       const json = await r.json();
 
       const vid =
@@ -2416,7 +2424,12 @@ document.addEventListener("DOMContentLoaded", () => {
         json.results.find(v => v.site === "YouTube");
 
       if (vid) {
-        playlist.push({ youtubeId: vid.key, title: movie.title || movie.name, desc: movie.overview || "" });
+        playlist.push({
+          youtubeId: vid.key,
+          title: item.title || item.name,
+          desc: item.overview || "",
+          mediaType: item.mediaType
+        });
         if (playlist.length === 1) { renderDots(); loadAtIndex(0); }
       }
     } catch {}
@@ -2444,25 +2457,34 @@ document.addEventListener("DOMContentLoaded", () => {
       data.results.forEach(item => {
         if (!item.poster_path) return;
 
+        const mediaLabel = item.media_type === "movie" ? "Movie" :
+                           item.media_type === "tv" ? "Series" : "Animation";
+
         const card = document.createElement("div");
         card.className = "poster-card";
         card.innerHTML = `
           <img src="https://image.tmdb.org/t/p/w500${item.poster_path}" alt="${item.title || item.name}">
-          <div class="poster-info">${item.title || item.name}</div>
+          <div class="poster-info">
+            ${item.title || item.name} <span class="media-label">${mediaLabel}</span>
+          </div>
         `;
 
         card.onclick = () => {
-          // Check if this movie already exists in the playlist
           let idx = playlist.findIndex(p => p.title === (item.title || item.name));
           if (idx === -1 && item.id) {
-            // Fetch trailer from TMDB dynamically if not in playlist
-            fetch(`https://api.themoviedb.org/3/movie/${item.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`)
+            const type = item.media_type === "tv" ? "tv" : "movie";
+            fetch(`https://api.themoviedb.org/3/${type}/${item.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`)
               .then(r => r.json())
               .then(json => {
                 const vid = json.results.find(v => v.site === "YouTube" && /trailer/i.test(v.type)) ||
                             json.results.find(v => v.site === "YouTube");
                 if (vid) {
-                  playlist.unshift({ youtubeId: vid.key, title: item.title || item.name, desc: item.overview || "" });
+                  playlist.unshift({
+                    youtubeId: vid.key,
+                    title: item.title || item.name,
+                    desc: item.overview || "",
+                    mediaType: mediaLabel
+                  });
                   renderDots();
                   loadAtIndex(0);
                 }
@@ -2477,8 +2499,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     } catch (e) { console.warn("Poster fetch error", e); }
   }
-
-  function openDetails(item) { console.log("Selected:", item); }
 
   /* ---------------- YOUTUBE PLAYER ---------------- */
   function loadYTAPI() {
@@ -2509,7 +2529,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (playlist.length === 0) return;
     currentIndex = (i + playlist.length) % playlist.length;
     const t = playlist[currentIndex];
-    titleEl.innerText = t.title;
+    titleEl.innerText = `${t.title} [${t.mediaType}]`;
     descEl.innerText = t.desc;
 
     if (ytPlayer) {
@@ -2574,34 +2594,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function stopCountdown() { if (countdownTimer) clearInterval(countdownTimer); countdownTimer = null; }
 
-  function updateTrailerPlaylist(movie) {
-    playlist.unshift({
-      youtubeId: extractYouTubeId(movie.trailer),
-      title: movie.title,
-      desc: movie.description
-    });
-    renderDots();
-    loadAtIndex(0);
-  }
-
   /* ---------------- START ---------------- */
   buildPlaylist();
 
 });
-// Poster scroll arrows
+
+/* ---------------- POSTER SCROLL ARROWS ---------------- */
 const posterGridEl = document.getElementById("posterGrid");
 const leftArrow = document.querySelector(".left-arrow");
 const rightArrow = document.querySelector(".right-arrow");
+const scrollAmount = 300; // scroll distance per click
 
-const scrollAmount = 300; // Adjust scroll distance per click
+leftArrow.onclick = () => posterGridEl.scrollBy({ left: -scrollAmount, behavior: "smooth" });
+rightArrow.onclick = () => posterGridEl.scrollBy({ left: scrollAmount, behavior: "smooth" });
 
-leftArrow.onclick = () => {
-  posterGridEl.scrollBy({ left: -scrollAmount, behavior: "smooth" });
-};
-
-rightArrow.onclick = () => {
-  posterGridEl.scrollBy({ left: scrollAmount, behavior: "smooth" });
-};
+/* ---------------- CSS FOR MEDIA LABELS ---------------- */
+const style = document.createElement("style");
+style.innerHTML = `
+  .media-label {
+    display: inline-block;
+    background: #00ff66;
+    color: #000;
+    font-size: 0.7rem;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 5px;
+  }
+`;
+document.head.appendChild(style);
 
 
 </script>
@@ -2610,6 +2631,7 @@ rightArrow.onclick = () => {
 
 </body>
 </html>
+
 
 
 
