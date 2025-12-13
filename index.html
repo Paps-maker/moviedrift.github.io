@@ -1407,8 +1407,14 @@ a.download-link:hover,
 </section>
 <section id="upcomingSection">
   <h2>Upcoming Releases</h2>
-  <div id="upcomingGrid"></div>
+
+  <div class="upcoming-wrapper">
+    <button class="upcoming-arrow left">&#10094;</button>
+    <div id="upcomingGrid"></div>
+    <button class="upcoming-arrow right">&#10095;</button>
+  </div>
 </section>
+
 <div class="toggle-buttons">
  
 </div>
@@ -2765,43 +2771,44 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ---------------- CSS FOR UPCOMING RELEASES ---------------- */
+/* ---------------- CSS FOR UPCOMING RELEASES ---------------- */
 const upcomingStyle = document.createElement("style");
 upcomingStyle.innerHTML = `
   #upcomingSection {
     padding: 20px 15px;
     background-color: #000;
     color: #fff;
+    position: relative;
   }
+
   #upcomingSection h2 {
-    font-size: 2rem;            /* larger title */
+    font-size: 2rem;
     margin-bottom: 15px;
     font-weight: 900;
-    color: #00ff66;             /* plain green */
-    text-shadow: none;          /* remove glow */
-    border-bottom: none;        /* remove underline */
+    color: #00ff66;
+    text-shadow: none;
+    border-bottom: none;
     display: inline-block;
-    padding-bottom: 0;
     letter-spacing: 1px;
   }
+
+  /* Wrapper for arrows + grid */
+  .upcoming-wrapper {
+    position: relative;
+  }
+
   #upcomingGrid {
     display: flex;
     gap: 16px;
     overflow-x: auto;
-    padding-bottom: 10px;
-    scrollbar-width: thin;
-    scrollbar-color: #00ff66 #222;
+    scroll-behavior: smooth;
+    padding: 5px 0 10px;
   }
-  #upcomingGrid::-webkit-scrollbar {
-    height: 8px;
-  }
-  #upcomingGrid::-webkit-scrollbar-track {
-    background: #222;
-    border-radius: 4px;
-  }
-  #upcomingGrid::-webkit-scrollbar-thumb {
-    background-color: #00ff66;
-    border-radius: 4px;
-  }
+
+  /* Hide scrollbar */
+  #upcomingGrid::-webkit-scrollbar { display: none; }
+  #upcomingGrid { scrollbar-width: none; }
+
   .upcoming-card {
     flex: 0 0 160px;
     background-color: #0a0a0a;
@@ -2809,38 +2816,46 @@ upcomingStyle.innerHTML = `
     transition: transform 0.3s, box-shadow 0.3s;
     cursor: pointer;
   }
+
   .upcoming-card:hover {
     transform: scale(1.05);
     box-shadow: 0 10px 25px rgba(0, 255, 102, 0.5);
   }
+
   .upcoming-image-wrapper {
     position: relative;
     border-radius: 10px;
     overflow: hidden;
   }
+
   .upcoming-image-wrapper img {
     width: 100%;
     display: block;
     border-radius: 10px;
     transition: transform 0.3s;
   }
+
   .upcoming-card:hover img {
     transform: scale(1.03);
   }
+
   .upcoming-info {
     padding: 8px 4px;
     text-align: center;
   }
+
   .upcoming-title {
     font-size: 1rem;
     font-weight: bold;
-    margin-bottom: 2px;
     color: #fff;
   }
+
   .upcoming-year {
     font-size: 0.85rem;
     color: #aaa;
   }
+
+  /* Media label */
   .media-label {
     position: absolute;
     top: 6px;
@@ -2852,17 +2867,58 @@ upcomingStyle.innerHTML = `
     color: #000;
     z-index: 10;
   }
+
   .media-label.Movie { background-color: #00ff66; }
   .media-label.Series { background-color: #3399ff; }
   .media-label.Animation { background-color: #ffcc00; }
+
+  /* Arrows */
+  .upcoming-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0,0,0,0.7);
+    border: none;
+    color: #00ff66;
+    font-size: 22px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    cursor: pointer;
+    z-index: 20;
+    transition: background 0.3s, transform 0.3s;
+  }
+
+  .upcoming-arrow:hover {
+    background: rgba(0,255,102,0.2);
+    transform: translateY(-50%) scale(1.1);
+  }
+
+  .upcoming-arrow.left { left: -5px; }
+  .upcoming-arrow.right { right: -5px; }
 `;
 document.head.appendChild(upcomingStyle);
+const upcomingGrid = document.getElementById("upcomingGrid");
+const upLeft = document.querySelector(".upcoming-arrow.left");
+const upRight = document.querySelector(".upcoming-arrow.right");
+
+const scrollStep = 320;
+
+upLeft.onclick = () => {
+  upcomingGrid.scrollBy({ left: -scrollStep, behavior: "smooth" });
+};
+
+upRight.onclick = () => {
+  upcomingGrid.scrollBy({ left: scrollStep, behavior: "smooth" });
+};
+
 </script>
 
 
 
 </body>
 </html>
+
 
 
 
