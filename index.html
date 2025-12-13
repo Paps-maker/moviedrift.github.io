@@ -2022,7 +2022,48 @@ if (themeSelector) {
     localStorage.setItem("theme", theme);
   };
 }
+/* ---------------- ADD-ON: SECTIONS MATCH ORIGINAL THEME COLORS ---------------- */
+function applyThemeToSections(theme) {
+  const themeColors = {
+    dark:   { bg: "#000", cardBg: "#0a0a0a", accent: "#00ff6" },
+    white:  { bg: "#fff", cardBg: "#f9f9f9", accent: "#00aa66" },
+    pink:   { bg: "#fdf2f6", cardBg: "#2b0b2b", accent: "#ff66aa" },
+    blue:   { bg: "#0a0a1a", cardBg: "#0b0b2b", accent: "#3399ff" },
+    gold:   { bg: "#1a1400", cardBg: "#2b2200", accent: "#ffcc00" },
+    purple: { bg: "#0a001a", cardBg: "#1a002b", accent: "#cc66ff" }
+  };
 
+  const colors = themeColors[theme] || themeColors.dark;
+
+  // Update section backgrounds
+  ["posterShowcase", "trailerShowcase", "upcomingSection"].forEach(id => {
+    const section = document.getElementById(id);
+    if (section) section.style.backgroundColor = colors.bg;
+  });
+
+  // Update cards and buttons
+  document.querySelectorAll(".poster-card, .trailer-btn, .upcoming-card").forEach(el => {
+    el.style.backgroundColor = colors.cardBg;
+    el.style.color = colors.accent;
+  });
+
+  // Update Upcoming Releases title
+  document.querySelectorAll("#upcomingSection h2").forEach(h => {
+    h.style.color = colors.accent;
+  });
+}
+
+// Apply theme on page load
+applyThemeToSections(localStorage.getItem("theme") || "dark");
+
+// Hook into existing theme selector onchange
+if (themeSelector) {
+  const originalOnChange = themeSelector.onchange;
+  themeSelector.onchange = () => {
+    if (originalOnChange) originalOnChange(); // call existing handler
+    applyThemeToSections(themeSelector.value); // update sections
+  };
+}
 
 /* Page init */
 loadCurrentUser();
@@ -2650,6 +2691,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
