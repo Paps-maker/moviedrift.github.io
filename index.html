@@ -1208,6 +1208,82 @@ a.download-link:hover,
   .trailer-desc { font-size: 12px; }
 }
 
+/* ---------------- Poster Showcase ---------------- */
+.poster-showcase {
+  padding: 20px;
+  background-color: #0a0a0a; /* Dark background to match trailer section */
+  color: #00ff66;
+}
+
+.poster-showcase .poster-title {
+  font-size: 1.5rem;
+  margin-bottom: 15px;
+  font-weight: bold;
+  text-align: left;
+}
+
+.poster-grid {
+  display: flex;
+  flex-wrap: nowrap; /* horizontal scroll */
+  overflow-x: auto;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+
+.poster-grid::-webkit-scrollbar {
+  height: 8px;
+}
+
+.poster-grid::-webkit-scrollbar-thumb {
+  background-color: #00ff66;
+  border-radius: 4px;
+}
+
+.poster-grid::-webkit-scrollbar-track {
+  background: #111;
+  border-radius: 4px;
+}
+
+.poster-card {
+  flex: 0 0 auto;
+  width: 140px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: #111;
+}
+
+.poster-card img {
+  width: 100%;
+  display: block;
+  border-bottom: 1px solid #222;
+}
+
+.poster-card .poster-info {
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 5px 3px;
+  color: #00ff66;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.poster-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(0, 255, 102, 0.4);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .poster-card { width: 110px; }
+}
+
+@media (max-width: 480px) {
+  .poster-card { width: 90px; }
+  .poster-showcase .poster-title { font-size: 1.2rem; }
+}
 
 </style>
 </head>
@@ -1263,6 +1339,13 @@ a.download-link:hover,
   </div>
    
 </header>
+<!-- ================= Poster Showcase ================= -->
+<section id="posterShowcase" class="poster-showcase">
+  <h2 class="poster-title">Trending Posters</h2>
+  <div id="posterGrid" class="poster-grid">
+    <!-- Poster cards will be injected here via JS -->
+  </div>
+</section>
 
 <!-- TRAILER SHOWCASE -->
 <section id="trailerShowcase" class="trailer-showcase">
@@ -2200,7 +2283,7 @@ document.getElementById("backToTop").addEventListener("click", () => {
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
-/* ---------------- TRAILER SHOWCASE (manual + TMDB + Shuffle + Countdown) ---------------- */
+/* ---------------- TRAILER SHOWCASE (manual + TMDB + Shuffle + Countdown + Poster Grid) ---------------- */
 document.addEventListener("DOMContentLoaded", () => {
 
   /* ---------------- CONFIG ---------------- */
@@ -2209,7 +2292,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
   const tmdbMode = "now_playing";
   const movieIds = [];
-  const tmdbLimit = 100; // gets MANY new trailers automatically
+  const tmdbLimit = 100;
 
   /* ---------------- INTERNAL ---------------- */
   const playerPlaceholder = document.getElementById("ytPlayerPlaceholder");
@@ -2219,27 +2302,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const nextBtn = document.getElementById("nextTrailer");
   const prevBtn = document.getElementById("prevTrailer");
   const dotsWrap = document.getElementById("trailerDots");
+  const posterGrid = document.getElementById("posterGrid");
 
   let playlist = [];
   let currentIndex = 0;
   let ytPlayer = null;
   let isMuted = true;
 
-  /* Countdown */
   let countdownTimer = null;
   let countdownSeconds = 5;
 
-  /* ---------------- SEARCH HIDE TRAILERS ---------------- */
   const searchInput = document.getElementById("searchInput");
   const trailerSection = document.getElementById("trailerShowcase");
-
   if (searchInput && trailerSection) {
     searchInput.addEventListener("input", () => {
       trailerSection.style.display = searchInput.value.trim().length > 0 ? "none" : "block";
     });
   }
 
-  /* ---------------- UTIL ---------------- */
   function extractYouTubeId(url) {
     if (!url) return null;
     if (/^[A-Za-z0-9_-]{11}$/.test(url)) return url;
@@ -2252,7 +2332,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return m ? m[0] : null;
   }
 
-  /* ---------------- BUILD PLAYLIST (FAST LOADING) ---------------- */
+  /* ---------------- BUILD PLAYLIST ---------------- */
   async function buildPlaylist() {
     manualTrailers.forEach(t => {
       const id = extractYouTubeId(t.youtube);
@@ -2262,7 +2342,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (TMDB_API_KEY) {
       try {
         let movieList = [];
-
         if (movieIds.length > 0) {
           movieList = movieIds.map(id => ({ id }));
         } else {
@@ -2272,6 +2351,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         loadNextTrailerData(movieList, 0);
+        fetchPosters(); // fetch posters in parallel
 
       } catch (e) {
         console.warn("TMDB error", e);
@@ -2282,13 +2362,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function loadNextTrailerData(list, index) {
-    if (index >= list.length) {
-      finishPlaylist();
-      return;
-    }
+    if (index >= list.length) { finishPlaylist(); return; }
 
     const movie = list[index];
-
     try {
       const r = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`);
       const json = await r.json();
@@ -2298,19 +2374,10 @@ document.addEventListener("DOMContentLoaded", () => {
         json.results.find(v => v.site === "YouTube");
 
       if (vid) {
-        playlist.push({
-          youtubeId: vid.key,
-          title: movie.title || movie.name,
-          desc: movie.overview || ""
-        });
-
-        if (playlist.length === 1) {
-          renderDots();
-          loadAtIndex(0);
-        }
+        playlist.push({ youtubeId: vid.key, title: movie.title || movie.name, desc: movie.overview || "" });
+        if (playlist.length === 1) { renderDots(); loadAtIndex(0); }
       }
     } catch {}
-
     loadNextTrailerData(list, index + 1);
   }
 
@@ -2320,10 +2387,56 @@ document.addEventListener("DOMContentLoaded", () => {
       descEl.innerText = "Add manual trailers or configure TMDB.";
       return;
     }
-
     renderDots();
     loadAtIndex(0);
   }
+
+  /* ---------------- POSTER GRID ---------------- */
+  async function fetchPosters() {
+    if (!posterGrid) return;
+    try {
+      const res = await fetch(`https://api.themoviedb.org/3/trending/all/week?api_key=${TMDB_API_KEY}`);
+      const data = await res.json();
+      posterGrid.innerHTML = "";
+
+      data.results.forEach(item => {
+        if (!item.poster_path) return;
+
+        const card = document.createElement("div");
+        card.className = "poster-card";
+        card.innerHTML = `
+          <img src="https://image.tmdb.org/t/p/w500${item.poster_path}" alt="${item.title || item.name}">
+          <div class="poster-info">${item.title || item.name}</div>
+        `;
+
+        card.onclick = () => {
+          // Check if this movie already exists in the playlist
+          let idx = playlist.findIndex(p => p.title === (item.title || item.name));
+          if (idx === -1 && item.id) {
+            // Fetch trailer from TMDB dynamically if not in playlist
+            fetch(`https://api.themoviedb.org/3/movie/${item.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`)
+              .then(r => r.json())
+              .then(json => {
+                const vid = json.results.find(v => v.site === "YouTube" && /trailer/i.test(v.type)) ||
+                            json.results.find(v => v.site === "YouTube");
+                if (vid) {
+                  playlist.unshift({ youtubeId: vid.key, title: item.title || item.name, desc: item.overview || "" });
+                  renderDots();
+                  loadAtIndex(0);
+                }
+              });
+          } else {
+            loadAtIndex(idx);
+          }
+        };
+
+        posterGrid.appendChild(card);
+      });
+
+    } catch (e) { console.warn("Poster fetch error", e); }
+  }
+
+  function openDetails(item) { console.log("Selected:", item); }
 
   /* ---------------- YOUTUBE PLAYER ---------------- */
   function loadYTAPI() {
@@ -2344,22 +2457,15 @@ document.addEventListener("DOMContentLoaded", () => {
       height: "100%", width: "100%",
       videoId: playlist[currentIndex].youtubeId,
       playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, mute: 1 },
-      events: {
-        onReady: ev => ev.target.playVideo(),
-        onStateChange: ev => {
-          if (ev.data === 0) startCountdown();
-        }
-      }
+      events: { onReady: ev => ev.target.playVideo(), onStateChange: ev => { if (ev.data === 0) startCountdown(); } }
     });
   }
 
   /* ---------------- LOAD NEW TRAILER ---------------- */
   async function loadAtIndex(i) {
     stopCountdown();
-
     if (playlist.length === 0) return;
     currentIndex = (i + playlist.length) % playlist.length;
-
     const t = playlist[currentIndex];
     titleEl.innerText = t.title;
     descEl.innerText = t.desc;
@@ -2371,23 +2477,16 @@ document.addEventListener("DOMContentLoaded", () => {
       playerPlaceholder.innerHTML = "";
       await initPlayer();
     }
-
     updateDots();
   }
 
   function goNext() { stopCountdown(); loadAtIndex(currentIndex + 1); }
   function goPrev() { stopCountdown(); loadAtIndex(currentIndex - 1); }
 
-  muteBtn.onclick = () => {
-    isMuted = !isMuted;
-    if (ytPlayer) (isMuted ? ytPlayer.mute() : ytPlayer.unMute());
-    muteBtn.innerText = isMuted ? "Unmute" : "Mute";
-  };
-
+  muteBtn.onclick = () => { isMuted = !isMuted; if (ytPlayer) (isMuted ? ytPlayer.mute() : ytPlayer.unMute()); muteBtn.innerText = isMuted ? "Unmute" : "Mute"; };
   nextBtn.onclick = goNext;
   prevBtn.onclick = goPrev;
 
-  /* ---------------- DOTS ---------------- */
   function renderDots() {
     dotsWrap.innerHTML = "";
     playlist.forEach((_, i) => {
@@ -2404,15 +2503,12 @@ document.addEventListener("DOMContentLoaded", () => {
     dots.forEach((d, i) => d.classList.toggle("active", i === currentIndex));
   }
 
-  /* ---------------- SHUFFLE FEATURE ---------------- */
   function shufflePlaylist() {
     stopCountdown();
-
     for (let i = playlist.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [playlist[i], playlist[j]] = [playlist[j], playlist[i]];
     }
-
     renderDots();
     loadAtIndex(0);
   }
@@ -2424,36 +2520,24 @@ document.addEventListener("DOMContentLoaded", () => {
   shuffleBtn.onclick = shufflePlaylist;
   document.querySelector(".trailer-controls").appendChild(shuffleBtn);
 
-  /* ---------------- NEXT TRAILER COUNTDOWN ---------------- */
   function startCountdown() {
     let timeLeft = countdownSeconds;
-
     titleEl.innerText = playlist[currentIndex].title + ` (Next in ${timeLeft}s)`;
-
     countdownTimer = setInterval(() => {
       timeLeft--;
       titleEl.innerText = playlist[currentIndex].title + ` (Next in ${timeLeft}s)`;
-
-      if (timeLeft <= 0) {
-        stopCountdown();
-        goNext();
-      }
+      if (timeLeft <= 0) { stopCountdown(); goNext(); }
     }, 1000);
   }
 
-  function stopCountdown() {
-    if (countdownTimer) clearInterval(countdownTimer);
-    countdownTimer = null;
-  }
+  function stopCountdown() { if (countdownTimer) clearInterval(countdownTimer); countdownTimer = null; }
 
-  /* ======== ADD NEW MANUAL MOVIE TO PLAYLIST ======== */
   function updateTrailerPlaylist(movie) {
     playlist.unshift({
       youtubeId: extractYouTubeId(movie.trailer),
       title: movie.title,
       desc: movie.description
     });
-
     renderDots();
     loadAtIndex(0);
   }
@@ -2469,6 +2553,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
