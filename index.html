@@ -1405,7 +1405,10 @@ a.download-link:hover,
     </div>
   </div>
 </section>
-
+<section id="upcomingSection">
+  <h2>Upcoming Releases</h2>
+  <div id="upcomingGrid"></div>
+</section>
 <div class="toggle-buttons">
  
 </div>
@@ -1971,22 +1974,24 @@ window.removeFromWatchlist=function(i){watchlist.splice(i,1);localStorage.setIte
 
 /* Search & filters */
 const searchInput = document.getElementById("search");
-const trailerSection = document.getElementById("trailerShowcase"); // your trailer container
-const posterSection = document.getElementById("posterShowcase");   // your poster container
+const trailerSection = document.getElementById("trailerShowcase"); // trailer container
+const posterSection = document.getElementById("posterShowcase");   // poster container
+const upcomingSection = document.getElementById("upcomingSection"); // ✅ upcoming releases
 
 function handleSearchAndFilter() {
   renderMovies(); // your existing render
 
-  // Hide trailer section if search or filters have a value
+  // Hide sections if search or filters have a value
   const hasSearch = searchInput.value.trim().length > 0;
   const hasGenre = genreFilter.value !== "";
   const hasYear = yearFilter.value !== "";
   const hasType = document.getElementById("typeFilter").value !== "";
 
-  trailerSection.style.display = (hasSearch || hasGenre || hasYear || hasType) ? "none" : "block";
-  
-  // Hide poster section exactly the same way
-  posterSection.style.display = (hasSearch || hasGenre || hasYear || hasType) ? "none" : "block";
+  const shouldHide = hasSearch || hasGenre || hasYear || hasType;
+
+  trailerSection.style.display = shouldHide ? "none" : "block";
+  posterSection.style.display = shouldHide ? "none" : "block";
+  upcomingSection.style.display = shouldHide ? "none" : "block"; // ✅ added
 }
 
 // Attach to search and filters
@@ -2684,13 +2689,181 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
+/* ---------------- UPCOMING RELEASES (MANUAL SCROLL) ---------------- */
+document.addEventListener("DOMContentLoaded", () => {
 
+  const upcomingGrid = document.getElementById("upcomingGrid");
+  if (!upcomingGrid) return;
+
+  const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
+
+  async function fetchUpcomingMedia() {
+    try {
+      const today = new Date();
+
+      // Fetch upcoming movies
+      const moviesRes = await fetch(`https://api.themoviedb.org/3/movie/upcoming?api_key=${TMDB_API_KEY}&language=en-US`);
+      const moviesData = await moviesRes.json();
+
+      // Fetch upcoming TV series (next season or on air)
+      const tvRes = await fetch(`https://api.themoviedb.org/3/tv/on_the_air?api_key=${TMDB_API_KEY}&language=en-US`);
+      const tvData = await tvRes.json();
+
+      const upcomingList = [
+        ...moviesData.results
+          .filter(m => new Date(m.release_date) > today)
+          .map(m => ({
+            id: m.id,
+            title: m.title,
+            poster: m.poster_path,
+            mediaType: "Movie",
+            releaseDate: m.release_date
+          })),
+        ...tvData.results
+          .filter(t => t.first_air_date && new Date(t.first_air_date) > today)
+          .map(t => ({
+            id: t.id,
+            title: t.name,
+            poster: t.poster_path,
+            mediaType: "Series",
+            releaseDate: t.first_air_date
+          }))
+      ];
+
+      renderUpcoming(upcomingList);
+
+    } catch (e) {
+      console.warn("Upcoming media fetch error", e);
+    }
+  }
+
+  function renderUpcoming(list) {
+    upcomingGrid.innerHTML = "";
+    list.forEach(item => {
+      if (!item.poster) return;
+
+      const releaseYear = item.releaseDate ? item.releaseDate.slice(0, 4) : "TBA";
+
+      const card = document.createElement("div");
+      card.className = "upcoming-card";
+      card.innerHTML = `
+        <div class="upcoming-image-wrapper">
+          <img src="https://image.tmdb.org/t/p/w500${item.poster}" alt="${item.title}">
+          <span class="media-label ${item.mediaType}">${item.mediaType}</span>
+        </div>
+        <div class="upcoming-info">
+          <div class="upcoming-title">${item.title}</div>
+          <div class="upcoming-year">${releaseYear}</div>
+        </div>
+      `;
+      upcomingGrid.appendChild(card);
+    });
+  }
+
+  fetchUpcomingMedia();
+
+});
+
+/* ---------------- CSS FOR UPCOMING RELEASES ---------------- */
+const upcomingStyle = document.createElement("style");
+upcomingStyle.innerHTML = `
+  #upcomingSection {
+    padding: 20px 15px;
+    background-color: #000;
+    color: #fff;
+  }
+  #upcomingSection h2 {
+    font-size: 2rem;            /* larger title */
+    margin-bottom: 15px;
+    font-weight: 900;
+    color: #00ff66;             /* plain green */
+    text-shadow: none;          /* remove glow */
+    border-bottom: none;        /* remove underline */
+    display: inline-block;
+    padding-bottom: 0;
+    letter-spacing: 1px;
+  }
+  #upcomingGrid {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: #00ff66 #222;
+  }
+  #upcomingGrid::-webkit-scrollbar {
+    height: 8px;
+  }
+  #upcomingGrid::-webkit-scrollbar-track {
+    background: #222;
+    border-radius: 4px;
+  }
+  #upcomingGrid::-webkit-scrollbar-thumb {
+    background-color: #00ff66;
+    border-radius: 4px;
+  }
+  .upcoming-card {
+    flex: 0 0 160px;
+    background-color: #0a0a0a;
+    border-radius: 10px;
+    transition: transform 0.3s, box-shadow 0.3s;
+    cursor: pointer;
+  }
+  .upcoming-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 10px 25px rgba(0, 255, 102, 0.5);
+  }
+  .upcoming-image-wrapper {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .upcoming-image-wrapper img {
+    width: 100%;
+    display: block;
+    border-radius: 10px;
+    transition: transform 0.3s;
+  }
+  .upcoming-card:hover img {
+    transform: scale(1.03);
+  }
+  .upcoming-info {
+    padding: 8px 4px;
+    text-align: center;
+  }
+  .upcoming-title {
+    font-size: 1rem;
+    font-weight: bold;
+    margin-bottom: 2px;
+    color: #fff;
+  }
+  .upcoming-year {
+    font-size: 0.85rem;
+    color: #aaa;
+  }
+  .media-label {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 5px;
+    color: #000;
+    z-index: 10;
+  }
+  .media-label.Movie { background-color: #00ff66; }
+  .media-label.Series { background-color: #3399ff; }
+  .media-label.Animation { background-color: #ffcc00; }
+`;
+document.head.appendChild(upcomingStyle);
 </script>
 
 
 
 </body>
 </html>
+
 
 
 
