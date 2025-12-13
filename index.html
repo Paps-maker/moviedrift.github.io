@@ -2384,21 +2384,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (TMDB_API_KEY) {
       try {
         let movieList = [];
-
         if (movieIds.length > 0) {
           movieList = movieIds.map(id => ({ id, label: "Movie" }));
         } else {
-          // Movies
           const r = await fetch(`https://api.themoviedb.org/3/movie/${tmdbMode}?api_key=${TMDB_API_KEY}&language=en-US`);
           const json = await r.json();
           const movies = json.results.slice(0, tmdbLimit).map(m => ({ ...m, label: "Movie" }));
 
-          // Series
           const sRes = await fetch(`https://api.themoviedb.org/3/tv/${tmdbMode}?api_key=${TMDB_API_KEY}&language=en-US`);
           const sJson = await sRes.json();
           const series = sJson.results.slice(0, tmdbLimit).map(s => ({ ...s, label: "Series" }));
 
-          // Animation Movies
           const aRes = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=16&language=en-US&sort_by=popularity.desc`);
           const aJson = await aRes.json();
           const animations = aJson.results.slice(0, tmdbLimit).map(a => ({ ...a, label: "Animation" }));
@@ -2407,7 +2403,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         loadNextTrailerData(movieList, 0);
-        fetchPosters(); // fetch posters in parallel
+        fetchPosters();
 
       } catch (e) {
         console.warn("TMDB error", e);
@@ -2466,7 +2462,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const card = document.createElement("div");
         card.className = "poster-card";
-        const label = item.title ? "Movie" : "Series";
+        const label = item.title ? "Movie" : "Series"; // Label logic only
         card.innerHTML = `
           <img src="https://image.tmdb.org/t/p/w500${item.poster_path}" alt="${item.title || item.name}">
           <div class="poster-info">${item.title || item.name} (${label})</div>
@@ -2621,6 +2617,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
