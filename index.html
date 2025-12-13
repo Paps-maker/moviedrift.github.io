@@ -1233,20 +1233,14 @@ a.download-link:hover,
   gap: 10px;
   padding: 0 40px; /* space for arrows */
   scroll-behavior: smooth;
+
+  /* Hide scrollbar for all browsers */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;  /* IE 10+ */
 }
 
 .poster-grid::-webkit-scrollbar {
-  height: 8px;
-}
-
-.poster-grid::-webkit-scrollbar-thumb {
-  background-color: #00ff66;
-  border-radius: 4px;
-}
-
-.poster-grid::-webkit-scrollbar-track {
-  background: #111;
-  border-radius: 4px;
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .poster-card {
@@ -2600,6 +2594,7 @@ rightArrow.onclick = () => {
 
 </body>
 </html>
+
 
 
 
