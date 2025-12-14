@@ -2888,7 +2888,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
   const MAX_PAGES = 10;
 
-  const seenNew = new Set(JSON.parse(localStorage.getItem("seenUpcoming") || "[]"));
+  const seen = new Set(JSON.parse(localStorage.getItem("seenUpcoming") || "[]"));
 
   function todayZero() {
     const d = new Date();
@@ -2903,25 +2903,27 @@ document.addEventListener("DOMContentLoaded", () => {
   async function fetchUpcomingMedia() {
     try {
       const today = todayZero();
-      const uniqueMap = new Map(); // ✅ prevents duplicates
+      const upcomingList = [];
+      const addedIds = new Set(); // ✅ ONLY ADDITION
 
       for (let page = 1; page <= MAX_PAGES; page++) {
 
-        // ---------- MOVIES ----------
+        // Movies
         const moviesRes = await fetch(
           `https://api.themoviedb.org/3/movie/upcoming?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`
         );
         const moviesData = await moviesRes.json();
 
         moviesData.results.forEach(m => {
-          if (!m.release_date || !m.poster_path) return;
+          if (!m.release_date) return;
           if (new Date(m.release_date) <= today) return;
 
-          const key = `movie_${m.id}`;
-          if (uniqueMap.has(key)) return;
+          const id = "m" + m.id;
+          if (addedIds.has(id)) return; // ✅ prevent duplicate
 
-          uniqueMap.set(key, {
-            id: key,
+          addedIds.add(id);
+          upcomingList.push({
+            id,
             title: m.title,
             poster: m.poster_path,
             mediaType: "Movie",
@@ -2929,21 +2931,22 @@ document.addEventListener("DOMContentLoaded", () => {
           });
         });
 
-        // ---------- TV ----------
+        // TV Series
         const tvRes = await fetch(
           `https://api.themoviedb.org/3/tv/on_the_air?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`
         );
         const tvData = await tvRes.json();
 
         tvData.results.forEach(t => {
-          if (!t.first_air_date || !t.poster_path) return;
+          if (!t.first_air_date) return;
           if (new Date(t.first_air_date) <= today) return;
 
-          const key = `tv_${t.id}`;
-          if (uniqueMap.has(key)) return;
+          const id = "t" + t.id;
+          if (addedIds.has(id)) return; // ✅ prevent duplicate
 
-          uniqueMap.set(key, {
-            id: key,
+          addedIds.add(id);
+          upcomingList.push({
+            id,
             title: t.name,
             poster: t.poster_path,
             mediaType: "Series",
@@ -2952,8 +2955,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
 
-      renderUpcoming([...uniqueMap.values()]);
-      localStorage.setItem("seenUpcoming", JSON.stringify([...seenNew]));
+      renderUpcoming(upcomingList);
+      localStorage.setItem("seenUpcoming", JSON.stringify([...seen]));
 
     } catch (e) {
       console.warn("Upcoming media fetch error", e);
@@ -2964,10 +2967,13 @@ document.addEventListener("DOMContentLoaded", () => {
     upcomingGrid.innerHTML = "";
 
     list.forEach(item => {
-      const isNew = !seenNew.has(item.id);
+      if (!item.poster) return;
+
       const releaseYear = item.releaseDate
         ? item.releaseDate.slice(0, 4)
         : "TBA";
+
+      const isNew = !seen.has(item.id);
 
       const card = document.createElement("div");
       card.className = "upcoming-card";
@@ -2985,7 +2991,7 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
 
       upcomingGrid.appendChild(card);
-      seenNew.add(item.id);
+      seen.add(item.id);
     });
   }
 
@@ -2996,12 +3002,14 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
+
 </script>
 
 
 
 </body>
 </html>
+
 
 
 
