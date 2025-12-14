@@ -2749,118 +2749,161 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-/* ---------------- UPCOMING RELEASES (AUTO-UPDATING) ---------------- */
+/* ---------------- UPCOMING RELEASES (MANUAL SCROLL) ---------------- */
 document.addEventListener("DOMContentLoaded", () => {
 
   const upcomingGrid = document.getElementById("upcomingGrid");
   if (!upcomingGrid) return;
 
   const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
-  const AUTO_REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes
 
-  function getToday() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return today;
+  const MAX_PAGES = 10;
+  const LOAD_BATCH = 20;
+
+  let allUpcoming = [];
+  let renderIndex = 0;
+
+  const seen = new Set(JSON.parse(localStorage.getItem("seenUpcoming") || "[]"));
+
+  function normalizeToday() {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function daysLeft(date) {
+    const diff = new Date(date) - normalizeToday();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
   }
 
   async function fetchUpcomingMedia() {
     try {
-      const today = getToday();
-      let upcomingList = [];
+      const today = normalizeToday();
+      allUpcoming = [];
+      renderIndex = 0;
+      upcomingGrid.innerHTML = "";
 
-      /* -------- MOVIES -------- */
-      const moviesRes = await fetch(
-        `https://api.themoviedb.org/3/movie/upcoming?api_key=${TMDB_API_KEY}&language=en-US&page=1`
-      );
-      const moviesData = await moviesRes.json();
+      for (let page = 1; page <= MAX_PAGES; page++) {
 
-      moviesData.results.forEach(m => {
-        if (!m.release_date) return;
+        const moviesRes = await fetch(
+          `https://api.themoviedb.org/3/movie/upcoming?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`
+        );
+        const moviesData = await moviesRes.json();
 
-        const releaseDate = new Date(m.release_date);
-        if (releaseDate <= today) return;
+        const tvRes = await fetch(
+          `https://api.themoviedb.org/3/tv/on_the_air?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`
+        );
+        const tvData = await tvRes.json();
 
-        upcomingList.push({
-          id: m.id,
-          title: m.title,
-          poster: m.poster_path,
-          mediaType: "Movie",
-          releaseDate: m.release_date
+        moviesData.results.forEach(m => {
+          if (!m.release_date) return;
+          if (new Date(m.release_date) <= today) return;
+
+          allUpcoming.push({
+            id: "m" + m.id,
+            title: m.title,
+            poster: m.poster_path,
+            mediaType: "Movie",
+            releaseDate: m.release_date
+          });
         });
-      });
 
-      /* -------- TV SERIES -------- */
-      const tvRes = await fetch(
-        `https://api.themoviedb.org/3/tv/on_the_air?api_key=${TMDB_API_KEY}&language=en-US&page=1`
-      );
-      const tvData = await tvRes.json();
+        tvData.results.forEach(t => {
+          if (!t.first_air_date) return;
+          if (new Date(t.first_air_date) <= today) return;
 
-      tvData.results.forEach(t => {
-        if (!t.first_air_date) return;
-
-        const releaseDate = new Date(t.first_air_date);
-        if (releaseDate <= today) return;
-
-        upcomingList.push({
-          id: t.id,
-          title: t.name,
-          poster: t.poster_path,
-          mediaType: "Series",
-          releaseDate: t.first_air_date
+          allUpcoming.push({
+            id: "t" + t.id,
+            title: t.name,
+            poster: t.poster_path,
+            mediaType: "Series",
+            releaseDate: t.first_air_date
+          });
         });
-      });
+      }
 
-      renderUpcoming(upcomingList);
+      allUpcoming.sort((a, b) => new Date(a.releaseDate) - new Date(b.releaseDate));
+
+      renderUpcoming(allUpcoming);
+
+      localStorage.setItem("seenUpcoming", JSON.stringify([...seen]));
 
     } catch (e) {
-      console.warn("Upcoming auto-update error", e);
+      console.warn("Upcoming media fetch error", e);
     }
   }
 
   function renderUpcoming(list) {
-    upcomingGrid.innerHTML = "";
 
-    if (!list.length) {
-      upcomingGrid.innerHTML = `<p class="no-upcoming">No upcoming releases</p>`;
-      return;
-    }
+    const slice = list.slice(renderIndex, renderIndex + LOAD_BATCH);
+    renderIndex += LOAD_BATCH;
 
-    list.forEach(item => {
+    const grouped = {};
+
+    slice.forEach(item => {
       if (!item.poster) return;
+      const year = new Date(item.releaseDate).getFullYear();
+      grouped[year] = grouped[year] || [];
+      grouped[year].push(item);
+    });
 
-      const releaseYear = new Date(item.releaseDate).getFullYear();
+    Object.keys(grouped).forEach(year => {
 
-      const card = document.createElement("div");
-      card.className = "upcoming-card";
-      card.innerHTML = `
-        <div class="upcoming-image-wrapper">
-          <img src="https://image.tmdb.org/t/p/w500${item.poster}" alt="${item.title}">
-          <span class="media-label ${item.mediaType.toLowerCase()}">
-            ${item.mediaType}
-          </span>
-        </div>
-        <div class="upcoming-info">
-          <div class="upcoming-title">${item.title}</div>
-          <div class="upcoming-year">${releaseYear}</div>
-        </div>
-      `;
-      upcomingGrid.appendChild(card);
+      let yearSection = document.getElementById("year-" + year);
+      if (!yearSection) {
+        yearSection = document.createElement("div");
+        yearSection.id = "year-" + year;
+        yearSection.innerHTML = `<h2 class="year-title">${year}</h2>`;
+        upcomingGrid.appendChild(yearSection);
+      }
+
+      grouped[year].forEach(item => {
+
+        const releaseYear = item.releaseDate.slice(0, 4);
+        const countdown = daysLeft(item.releaseDate);
+        const isNew = !seen.has(item.id);
+
+        const card = document.createElement("div");
+        card.className = "upcoming-card";
+        card.innerHTML = `
+          <div class="upcoming-image-wrapper">
+            <img src="https://image.tmdb.org/t/p/w500${item.poster}" alt="${item.title}">
+            <span class="media-label ${item.mediaType}">${item.mediaType}</span>
+            <span class="countdown-badge">${countdown} days left</span>
+            ${isNew ? `<span class="new-badge">NEW</span>` : ``}
+          </div>
+          <div class="upcoming-info">
+            <div class="upcoming-title">${item.title}</div>
+            <div class="upcoming-year">${releaseYear}</div>
+          </div>
+        `;
+
+        yearSection.appendChild(card);
+        seen.add(item.id);
+      });
     });
   }
 
-  /* -------- INITIAL LOAD -------- */
-  fetchUpcomingMedia();
-
-  /* -------- AUTO REFRESH -------- */
-  setInterval(fetchUpcomingMedia, AUTO_REFRESH_INTERVAL);
-
-  /* -------- REFRESH WHEN USER RETURNS -------- */
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      fetchUpcomingMedia();
+  /* -------- INFINITE SCROLL -------- */
+  window.addEventListener("scroll", () => {
+    if (
+      window.innerHeight + window.scrollY >=
+      document.body.offsetHeight - 300
+    ) {
+      if (renderIndex < allUpcoming.length) {
+        renderUpcoming(allUpcoming);
+      }
     }
   });
+
+  /* -------- AUTO UPDATE -------- */
+  setInterval(fetchUpcomingMedia, 15 * 60 * 1000);
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) fetchUpcomingMedia();
+  });
+
+  fetchUpcomingMedia();
 
 });
 
@@ -2961,6 +3004,36 @@ upcomingStyle.innerHTML = `
     color: #000;
     z-index: 10;
   }
+.year-title {
+  margin: 40px 0 20px;
+  color: #00ff66;
+}
+
+.countdown-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: #000;
+  color: #00ff66;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.new-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #ff004c;
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.upcoming-image-wrapper {
+  position: relative;
+}
 
   .media-label.Movie { background-color: #00ff66; }
   .media-label.Series { background-color: #3399ff; }
@@ -3012,6 +3085,7 @@ upRight.onclick = () => {
 
 </body>
 </html>
+
 
 
 
