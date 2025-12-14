@@ -2750,80 +2750,77 @@ style.innerHTML = `
 document.head.appendChild(style);
 
 /* ---------------- CSS FOR UPCOMING RELEASES ---------------- */
-/* ---------------- CSS FOR UPCOMING RELEASES (FIXED CARD SIZE) ---------------- */
+/* ---------------- UPCOMING RELEASES (POSTER SHOWCASE STYLE) ---------------- */
 const upcomingStyle = document.createElement("style");
 upcomingStyle.innerHTML = `
   #upcomingSection {
-    padding: 20px 15px;
-    background-color: #000;
-    color: #fff;
-    position: relative;
+    padding: 20px;
+    background-color: #0a0a0a;
+    color: #00ff66;
   }
 
   #upcomingSection h2 {
-    font-size: 2rem;
+    font-size: 1.5rem;
     margin-bottom: 15px;
-    font-weight: 900;
-    color: #00ff66;
-    letter-spacing: 1px;
+    font-weight: bold;
+    text-align: left;
   }
 
-  .upcoming-wrapper { position: relative; }
+  /* Wrapper for arrows + grid */
+  .upcoming-wrapper {
+    position: relative;
+  }
 
   #upcomingGrid {
     display: flex;
-    gap: 16px;
+    flex-wrap: nowrap;
     overflow-x: auto;
+    gap: 10px;
+    padding: 0 40px; /* space for arrows */
     scroll-behavior: smooth;
-    padding: 5px 0 10px;
+
+    /* Hide scrollbar for all browsers */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;  /* IE 10+ */
   }
 
-  /* Hide scrollbar */
-  #upcomingGrid::-webkit-scrollbar { display: none; }
-  #upcomingGrid { scrollbar-width: none; }
+  #upcomingGrid::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
 
   .upcoming-card {
-    flex: 0 0 160px; /* ✅ FIXED WIDTH on all devices */
-    max-width: 160px;
-    background-color: #0a0a0a;
-    border-radius: 10px;
-    transition: transform 0.3s, box-shadow 0.3s;
+    flex: 0 0 auto;
+    width: 140px;
     cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border-radius: 6px;
+    overflow: hidden;
+    background-color: #111;
+  }
+
+  .upcoming-card img {
+    width: 100%;
+    display: block;
+    border-bottom: 1px solid #222;
+    border-radius: 6px 6px 0 0;
+  }
+
+  .upcoming-info {
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 5px 3px;
+    color: #00ff66;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .upcoming-card:hover {
     transform: scale(1.05);
-    box-shadow: 0 10px 25px rgba(0, 255, 102, 0.5);
+    box-shadow: 0 4px 15px rgba(0, 255, 102, 0.4);
   }
 
-  .upcoming-image-wrapper {
-    position: relative;
-    border-radius: 10px;
-    overflow: hidden;
-  }
-
-  .upcoming-image-wrapper img {
-    width: 100%;
-    display: block;
-    border-radius: 10px;
-  }
-
-  .upcoming-info {
-    padding: 8px 4px;
-    text-align: center;
-  }
-
-  .upcoming-title {
-    font-size: 1rem;
-    font-weight: bold;
-    color: #00ff66;
-  }
-
-  .upcoming-year {
-    font-size: 0.85rem;
-    color: #00ff66;
-  }
-
+  /* Media labels, countdown, new badge */
   .media-label {
     position: absolute;
     top: 6px;
@@ -2835,7 +2832,6 @@ upcomingStyle.innerHTML = `
     color: #000;
     z-index: 10;
   }
-
   .media-label.Movie { background-color: #00ff66; }
   .media-label.Series { background-color: #3399ff; }
 
@@ -2861,48 +2857,40 @@ upcomingStyle.innerHTML = `
     border-radius: 6px;
   }
 
+  /* Arrows */
   .upcoming-arrow {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    background: rgba(0,0,0,0.7);
+    width: 30px;
+    height: 60px;
+    background-color: rgba(0,0,0,0.6);
     border: none;
     color: #00ff66;
-    font-size: 22px;
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
+    font-size: 2rem;
     cursor: pointer;
-    z-index: 20;
+    z-index: 10;
+    border-radius: 4px;
   }
 
-  .upcoming-arrow.left { left: -5px; }
-  .upcoming-arrow.right { right: -5px; }
+  .upcoming-arrow.left { left: 5px; }
+  .upcoming-arrow.right { right: 5px; }
 
-  /* ---------------- RESPONSIVE ---------------- */
-  @media (max-width: 1200px) {
-    /* keep width fixed */
-    .upcoming-card { flex: 0 0 160px; max-width: 160px; }
+  .upcoming-arrow:hover {
+    background-color: rgba(0,0,0,0.9);
   }
 
-  @media (max-width: 992px) {
-    .upcoming-card { flex: 0 0 160px; max-width: 160px; }
-    .upcoming-arrow { width: 32px; height: 32px; font-size: 20px; }
-  }
-
+  /* Responsive adjustments */
   @media (max-width: 768px) {
-    .upcoming-card { flex: 0 0 160px; max-width: 160px; }
-    #upcomingGrid { gap: 12px; }
+    .upcoming-card { width: 110px; }
   }
 
   @media (max-width: 480px) {
-    .upcoming-card { flex: 0 0 160px; max-width: 160px; }
-    #upcomingGrid { gap: 8px; padding: 5px 0 8px; }
-    .upcoming-arrow { width: 28px; height: 28px; font-size: 18px; }
+    .upcoming-card { width: 90px; }
+    #upcomingSection h2 { font-size: 1.2rem; }
   }
 `;
 document.head.appendChild(upcomingStyle);
-
 
 /* ---------------- UPCOMING RELEASES (MANUAL SCROLL) ---------------- */
 document.addEventListener("DOMContentLoaded", () => {
@@ -3042,6 +3030,7 @@ if (upLeft && upRight) {
 
 </body>
 </html>
+
 
 
 
