@@ -2750,7 +2750,7 @@ style.innerHTML = `
 document.head.appendChild(style);
 
 /* ---------------- CSS FOR UPCOMING RELEASES ---------------- */
-/* ---------------- CSS FOR UPCOMING RELEASES (RESPONSIVE) ---------------- */
+/* ---------------- CSS FOR UPCOMING RELEASES (FIXED CARD SIZE) ---------------- */
 const upcomingStyle = document.createElement("style");
 upcomingStyle.innerHTML = `
   #upcomingSection {
@@ -2783,7 +2783,8 @@ upcomingStyle.innerHTML = `
   #upcomingGrid { scrollbar-width: none; }
 
   .upcoming-card {
-    flex: 0 0 160px;
+    flex: 0 0 160px; /* ✅ FIXED WIDTH on all devices */
+    max-width: 160px;
     background-color: #0a0a0a;
     border-radius: 10px;
     transition: transform 0.3s, box-shadow 0.3s;
@@ -2880,34 +2881,28 @@ upcomingStyle.innerHTML = `
 
   /* ---------------- RESPONSIVE ---------------- */
   @media (max-width: 1200px) {
-    .upcoming-card { flex: 0 0 140px; }
-    .upcoming-title { font-size: 0.95rem; }
-    .upcoming-year { font-size: 0.8rem; }
+    /* keep width fixed */
+    .upcoming-card { flex: 0 0 160px; max-width: 160px; }
   }
 
   @media (max-width: 992px) {
-    .upcoming-card { flex: 0 0 120px; }
-    .upcoming-title { font-size: 0.9rem; }
-    .upcoming-year { font-size: 0.75rem; }
+    .upcoming-card { flex: 0 0 160px; max-width: 160px; }
     .upcoming-arrow { width: 32px; height: 32px; font-size: 20px; }
   }
 
   @media (max-width: 768px) {
+    .upcoming-card { flex: 0 0 160px; max-width: 160px; }
     #upcomingGrid { gap: 12px; }
-    .upcoming-card { flex: 0 0 100px; }
-    .upcoming-title { font-size: 0.85rem; }
-    .upcoming-year { font-size: 0.7rem; }
   }
 
   @media (max-width: 480px) {
+    .upcoming-card { flex: 0 0 160px; max-width: 160px; }
     #upcomingGrid { gap: 8px; padding: 5px 0 8px; }
-    .upcoming-card { flex: 0 0 80px; }
-    .upcoming-title { font-size: 0.8rem; }
-    .upcoming-year { font-size: 0.65rem; }
     .upcoming-arrow { width: 28px; height: 28px; font-size: 18px; }
   }
 `;
 document.head.appendChild(upcomingStyle);
+
 
 /* ---------------- UPCOMING RELEASES (MANUAL SCROLL) ---------------- */
 document.addEventListener("DOMContentLoaded", () => {
@@ -3047,6 +3042,7 @@ if (upLeft && upRight) {
 
 </body>
 </html>
+
 
 
 
