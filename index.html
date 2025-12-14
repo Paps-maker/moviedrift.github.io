@@ -2750,7 +2750,7 @@ style.innerHTML = `
 document.head.appendChild(style);
 
 /* ---------------- CSS FOR UPCOMING RELEASES ---------------- */
-/* ---------------- CSS FOR UPCOMING RELEASES (RESPONSIVE) ---------------- */ 
+/* ---------------- CSS FOR UPCOMING RELEASES (RESPONSIVE + LONG TITLES) ---------------- */ 
 const upcomingStyle = document.createElement("style");
 upcomingStyle.innerHTML = `
   #upcomingSection {
@@ -2812,10 +2812,14 @@ upcomingStyle.innerHTML = `
     text-align: center;
   }
 
+  /* ---------------- TITLE ---------------- */
   .upcoming-title {
     font-size: 1rem;
     font-weight: bold;
     color: #00ff66;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .upcoming-year {
@@ -2901,6 +2905,7 @@ upcomingStyle.innerHTML = `
   }
 `;
 document.head.appendChild(upcomingStyle);
+
 
 /* ---------------- UPCOMING RELEASES (MANUAL SCROLL) ---------------- */
 document.addEventListener("DOMContentLoaded", () => {
@@ -3040,6 +3045,7 @@ if (upLeft && upRight) {
 
 </body>
 </html>
+
 
 
 
