@@ -1316,9 +1316,62 @@ a.download-link:hover,
   border-radius: 3px;
   font-weight: bold;
 }
+.notification-modal {
+  display: none;
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  background: rgba(0,0,0,0.92);
+  color: #00ff66;
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(0,255,102,0.45);
+  max-width: 360px;
+}
+
+.notification-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+#notifPoster {
+  width: 60px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #111;
+}
+
+.notif-text-wrap {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.close-notif {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  color: #fff;
+}
 
 </style>
 </head>
+  <div id="notificationModal" class="notification-modal">
+  <div class="notification-content">
+    <img id="notifPoster" src="" alt="Poster">
+    <div class="notif-text-wrap">
+      <p id="notificationText"></p>
+    </div>
+    <span class="close-notif">&times;</span>
+  </div>
+</div>
+
 <body>
 <div id="backToTop">
   <i class="arrow">▲</i>
@@ -1774,79 +1827,112 @@ function populateFilters() {
   Array.from(yearSet).sort((a,b)=>b-a).forEach(y=>yearFilter.innerHTML+=`<option value="${y}">${y}</option>`);
 }
 
-/* Render movies */
+/* ================= NOTIFICATION SYSTEM ================= */
+
+let notifTimer = null;
+
+function showNotification(message, poster = "", duration = 60000) {
+  const modal = document.getElementById("notificationModal");
+  const text  = document.getElementById("notificationText");
+  const img   = document.getElementById("notifPoster");
+
+  if (!modal || !text || !img) return;
+
+  text.textContent = message;
+
+  if (poster) {
+    img.src = poster;
+    img.style.display = "block";
+  } else {
+    img.style.display = "none";
+  }
+
+  modal.style.display = "block";
+
+  if (notifTimer) clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => {
+    modal.style.display = "none";
+  }, duration);
+}
+
+document.addEventListener("click", e => {
+  if (e.target.classList.contains("close-notif")) {
+    document.getElementById("notificationModal").style.display = "none";
+    if (notifTimer) clearTimeout(notifTimer);
+  }
+});
+
+/* ================= RENDER MOVIES ================= */
+
 function renderMovies() {
   const grid = document.getElementById("grid");
   const searchText = document.getElementById("search").value.toLowerCase();
   const selectedGenre = genreFilter.value;
   const selectedYear = yearFilter.value;
   const selectedType = document.getElementById("typeFilter").value;
+
   grid.innerHTML = "";
 
   const filtered = movies.filter(m => {
-    const matchesSearch = (m.title||'').toLowerCase().includes(searchText);
+    const matchesSearch = (m.title || "").toLowerCase().includes(searchText);
     const matchesGenre = !selectedGenre || (m.genres && m.genres.includes(selectedGenre));
-    const matchesYear = !selectedYear || m.year == selectedYear;
-    const matchesType = !selectedType || m.type === selectedType || !m.type;
+    const matchesYear  = !selectedYear || m.year == selectedYear;
+    const matchesType  = !selectedType || m.type === selectedType || !m.type;
     return matchesSearch && matchesGenre && matchesYear && matchesType;
   });
 
-  const now = Date.now(); // needed for badge timing
+  const now = Date.now();
 
   filtered.forEach((m, index) => {
 
-    // -------------------- BADGES --------------------
     let badgesHTML = "";
 
-    // NEW MOVIE (< 24h)
-    if (m.type !== "Series" && now - (m.createdAt || 0) < 24 * 60 * 60 * 1000) {
-      badgesHTML += `
-        <div class="movie-glow-badge fade-out-24h">NEW MOVIE</div>
-      `;
+    /* -------- NEW MOVIE -------- */
+    if (m.type !== "Series" && now - (m.createdAt || 0) < 86400000) {
+      badgesHTML += `<div class="movie-glow-badge fade-out-24h">NEW MOVIE</div>`;
+      showNotification(`New movie added: "${m.title}"`, m.poster);
     }
 
-    // HOT (views ≥ 1000)
+    /* -------- HOT -------- */
     if (m.views && m.views >= 1000) {
-      badgesHTML += `
-        <div class="hot-badge">HOT</div>
-      `;
+      badgesHTML += `<div class="hot-badge">HOT</div>`;
     }
 
-    // NEW EPISODE for series
-    if (m.type === "Series" && m.episodes && m.episodes.length > 0) {
+    /* -------- SERIES EPISODES -------- */
+    if (m.type === "Series" && m.episodes?.length) {
       const latest = m.episodes[m.episodes.length - 1];
-      const addedAt = latest.createdAt || now;
-      const isFresh = (now - addedAt) < 24 * 60 * 60 * 1000;
+      const isFresh = now - (latest.createdAt || now) < 86400000;
       const ep = latest.ep || 0;
       const season = latest.season || 1;
-      const notWatched = !hasWatched(m.id, ep);
 
-      if (isFresh && notWatched) {
+      if (isFresh && !hasWatched(m.id, ep)) {
         badgesHTML += `
-          <div class="new-badge fade-out-24h">NEW Episode S${season}E${ep}</div>
+          <div class="new-badge fade-out-24h">
+            NEW Episode S${season}E${ep}
+          </div>
         `;
-      }
 
-      if (m.episodes.some(epObj => now - (epObj.createdAt || now) < 24 * 60 * 60 * 1000)) {
-        badgesHTML += `
-          <div class="new-episode-added fade-out-24h"></div>
-        `;
+        showNotification(
+          `New episode S${season}E${ep} added: "${m.title}"`,
+          m.poster
+        );
       }
     }
-    // ------------------------------------------------
 
-    const ratingText = m.rating ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating*10)}%)` : "";
+    const ratingText = m.rating
+      ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating * 10)}%)`
+      : "";
+
     const card = document.createElement("div");
     card.className = "card";
 
     card.innerHTML = `
       <div class="poster-wrapper" style="position:relative;">
         <div class="badges-container">${badgesHTML}</div>
-
-        <img class="poster" src="${m.poster||''}" alt="${(m.title||'').replace(/"/g,'&quot;')}">
+        <img class="poster" src="${m.poster || ""}">
       </div>
 
-      <div class="card-body">
+     <div class="card-body">
         <h3 class="movie-title">${(m.title||'').replace(/</g,'&lt;')}</h3>
         <div class="meta">${m.year || ''} · ${(m.genres||[]).join(", ")}</div>
         <div class="rating">${ratingText}</div>
@@ -1877,11 +1963,10 @@ function renderMovies() {
 
         </div>
       </div>`;
+    
 
-    // ✔ Click poster to watch
-    const poster = card.querySelector(".poster");
-    poster.style.cursor = "pointer";
-    poster.addEventListener("click", () => protectedAction("watch", index));
+    card.querySelector(".poster").onclick = () =>
+      protectedAction("watch", index);
 
     grid.appendChild(card);
   });
@@ -1889,17 +1974,32 @@ function renderMovies() {
   window.currentFiltered = filtered;
 }
 
-/* ---------------- Protected action ---------------- */
+/* ================= PROTECTED ACTION ================= */
+
 window.protectedAction = function(action, index) {
-  if(currentUser){
-    if(currentUser.status !== "Paid"){
-      alert("⚠ Your account is unpaid. Please contact support to regain access.");
-      return;
-    }
-    if(action==='details') return viewDetailsByFiltered(index);
-    if(action==='watch') return viewAndPlayByFiltered(index);
-    if(action==='add') return addToWatchlistByFiltered(index);
-  } else showGuestModal(action);
+
+  if (!currentUser) {
+    showGuestModal(action);
+    return;
+  }
+
+  if (currentUser.status !== "Paid") {
+    alert("⚠ Your account is unpaid. Please contact support.");
+    return;
+  }
+
+  if (action === "details") return viewDetailsByFiltered(index);
+  if (action === "watch")   return viewAndPlayByFiltered(index);
+
+  if (action === "add") {
+    const movie = currentFiltered[index];
+    addToWatchlistByFiltered(index);
+
+    showNotification(
+      `"${movie.title}" added to your watchlist`,
+      movie.poster
+    );
+  }
 };
 
 /* ---------------- Guest modal ---------------- */
@@ -3045,6 +3145,7 @@ if (upLeft && upRight) {
 
 </body>
 </html>
+
 
 
 
