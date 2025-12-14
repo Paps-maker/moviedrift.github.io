@@ -2750,7 +2750,7 @@ style.innerHTML = `
 document.head.appendChild(style);
 
 /* ---------------- CSS FOR UPCOMING RELEASES ---------------- */
-/* ---------------- CSS FOR UPCOMING RELEASES ---------------- */
+/* ---------------- CSS FOR UPCOMING RELEASES (RESPONSIVE) ---------------- */
 const upcomingStyle = document.createElement("style");
 upcomingStyle.innerHTML = `
   #upcomingSection {
@@ -2778,6 +2778,7 @@ upcomingStyle.innerHTML = `
     padding: 5px 0 10px;
   }
 
+  /* Hide scrollbar */
   #upcomingGrid::-webkit-scrollbar { display: none; }
   #upcomingGrid { scrollbar-width: none; }
 
@@ -2876,6 +2877,35 @@ upcomingStyle.innerHTML = `
 
   .upcoming-arrow.left { left: -5px; }
   .upcoming-arrow.right { right: -5px; }
+
+  /* ---------------- RESPONSIVE ---------------- */
+  @media (max-width: 1200px) {
+    .upcoming-card { flex: 0 0 140px; }
+    .upcoming-title { font-size: 0.95rem; }
+    .upcoming-year { font-size: 0.8rem; }
+  }
+
+  @media (max-width: 992px) {
+    .upcoming-card { flex: 0 0 120px; }
+    .upcoming-title { font-size: 0.9rem; }
+    .upcoming-year { font-size: 0.75rem; }
+    .upcoming-arrow { width: 32px; height: 32px; font-size: 20px; }
+  }
+
+  @media (max-width: 768px) {
+    #upcomingGrid { gap: 12px; }
+    .upcoming-card { flex: 0 0 100px; }
+    .upcoming-title { font-size: 0.85rem; }
+    .upcoming-year { font-size: 0.7rem; }
+  }
+
+  @media (max-width: 480px) {
+    #upcomingGrid { gap: 8px; padding: 5px 0 8px; }
+    .upcoming-card { flex: 0 0 80px; }
+    .upcoming-title { font-size: 0.8rem; }
+    .upcoming-year { font-size: 0.65rem; }
+    .upcoming-arrow { width: 28px; height: 28px; font-size: 18px; }
+  }
 `;
 document.head.appendChild(upcomingStyle);
 
@@ -3017,6 +3047,7 @@ if (upLeft && upRight) {
 
 </body>
 </html>
+
 
 
 
