@@ -2923,16 +2923,10 @@ upcomingStyle.innerHTML = `
     margin-bottom: 15px;
     font-weight: 900;
     color: #00ff66;
-    text-shadow: none;
-    border-bottom: none;
-    display: inline-block;
     letter-spacing: 1px;
   }
 
-  /* Wrapper for arrows + grid */
-  .upcoming-wrapper {
-    position: relative;
-  }
+  .upcoming-wrapper { position: relative; }
 
   #upcomingGrid {
     display: flex;
@@ -2942,7 +2936,6 @@ upcomingStyle.innerHTML = `
     padding: 5px 0 10px;
   }
 
-  /* Hide scrollbar */
   #upcomingGrid::-webkit-scrollbar { display: none; }
   #upcomingGrid { scrollbar-width: none; }
 
@@ -2969,11 +2962,6 @@ upcomingStyle.innerHTML = `
     width: 100%;
     display: block;
     border-radius: 10px;
-    transition: transform 0.3s;
-  }
-
-  .upcoming-card:hover img {
-    transform: scale(1.03);
   }
 
   .upcoming-info {
@@ -2992,7 +2980,6 @@ upcomingStyle.innerHTML = `
     color: #00ff66;
   }
 
-  /* Media label */
   .media-label {
     position: absolute;
     top: 6px;
@@ -3004,42 +2991,33 @@ upcomingStyle.innerHTML = `
     color: #000;
     z-index: 10;
   }
-.year-title {
-  margin: 40px 0 20px;
-  color: #00ff66;
-}
-
-.countdown-badge {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
-  background: #000;
-  color: #00ff66;
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 6px;
-}
-
-.new-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: #ff004c;
-  color: #fff;
-  font-size: 11px;
-  padding: 4px 6px;
-  border-radius: 6px;
-}
-
-.upcoming-image-wrapper {
-  position: relative;
-}
 
   .media-label.Movie { background-color: #00ff66; }
   .media-label.Series { background-color: #3399ff; }
   .media-label.Animation { background-color: #ffcc00; }
 
-  /* Arrows */
+  .countdown-badge {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    background: #000;
+    color: #00ff66;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+
+  .new-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #ff004c;
+    color: #fff;
+    font-size: 11px;
+    padding: 4px 6px;
+    border-radius: 6px;
+  }
+
   .upcoming-arrow {
     position: absolute;
     top: 50%;
@@ -3053,31 +3031,115 @@ upcomingStyle.innerHTML = `
     border-radius: 50%;
     cursor: pointer;
     z-index: 20;
-    transition: background 0.3s, transform 0.3s;
-  }
-
-  .upcoming-arrow:hover {
-    background: rgba(0,255,102,0.2);
-    transform: translateY(-50%) scale(1.1);
   }
 
   .upcoming-arrow.left { left: -5px; }
   .upcoming-arrow.right { right: -5px; }
 `;
 document.head.appendChild(upcomingStyle);
-const upcomingGrid = document.getElementById("upcomingGrid");
-const upLeft = document.querySelector(".upcoming-arrow.left");
-const upRight = document.querySelector(".upcoming-arrow.right");
 
-const scrollStep = 320;
+/* ---------------- UPCOMING RELEASES (MANUAL SCROLL) ---------------- */
+document.addEventListener("DOMContentLoaded", () => {
 
-upLeft.onclick = () => {
-  upcomingGrid.scrollBy({ left: -scrollStep, behavior: "smooth" });
-};
+  const upcomingGrid = document.getElementById("upcomingGrid");
+  if (!upcomingGrid) return;
 
-upRight.onclick = () => {
-  upcomingGrid.scrollBy({ left: scrollStep, behavior: "smooth" });
-};
+  const upLeft = document.querySelector(".upcoming-arrow.left");
+  const upRight = document.querySelector(".upcoming-arrow.right");
+  const scrollStep = 320;
+
+  if (upLeft && upRight) {
+    upLeft.onclick = () => upcomingGrid.scrollBy({ left: -scrollStep, behavior: "smooth" });
+    upRight.onclick = () => upcomingGrid.scrollBy({ left: scrollStep, behavior: "smooth" });
+  }
+
+  const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
+  const MAX_PAGES = 10;
+  const seen = new Set(JSON.parse(localStorage.getItem("seenUpcoming") || "[]"));
+
+  function todayZero() {
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    return d;
+  }
+
+  function daysLeft(date) {
+    return Math.ceil((new Date(date) - todayZero()) / 86400000);
+  }
+
+  async function fetchUpcomingMedia() {
+    try {
+      upcomingGrid.innerHTML = "";
+      const today = todayZero();
+      const allUpcoming = [];
+
+      for (let page = 1; page <= MAX_PAGES; page++) {
+
+        const movies = await fetch(
+          `https://api.themoviedb.org/3/movie/upcoming?api_key=${TMDB_API_KEY}&page=${page}`
+        ).then(r => r.json());
+
+        const tv = await fetch(
+          `https://api.themoviedb.org/3/tv/on_the_air?api_key=${TMDB_API_KEY}&page=${page}`
+        ).then(r => r.json());
+
+        movies.results.forEach(m => {
+          if (m.release_date && new Date(m.release_date) > today) {
+            allUpcoming.push({
+              id: "m"+m.id,
+              title: m.title,
+              poster: m.poster_path,
+              mediaType: "Movie",
+              releaseDate: m.release_date
+            });
+          }
+        });
+
+        tv.results.forEach(t => {
+          if (t.first_air_date && new Date(t.first_air_date) > today) {
+            allUpcoming.push({
+              id: "t"+t.id,
+              title: t.name,
+              poster: t.poster_path,
+              mediaType: "Series",
+              releaseDate: t.first_air_date
+            });
+          }
+        });
+      }
+
+      allUpcoming.forEach(item => {
+        if (!item.poster) return;
+
+        const isNew = !seen.has(item.id);
+        const card = document.createElement("div");
+        card.className = "upcoming-card";
+        card.innerHTML = `
+          <div class="upcoming-image-wrapper">
+            <img src="https://image.tmdb.org/t/p/w500${item.poster}">
+            <span class="media-label ${item.mediaType}">${item.mediaType}</span>
+            <span class="countdown-badge">${daysLeft(item.releaseDate)} days left</span>
+            ${isNew ? `<span class="new-badge">NEW</span>` : ``}
+          </div>
+          <div class="upcoming-info">
+            <div class="upcoming-title">${item.title}</div>
+            <div class="upcoming-year">${item.releaseDate.slice(0,4)}</div>
+          </div>
+        `;
+        upcomingGrid.appendChild(card);
+        seen.add(item.id);
+      });
+
+      localStorage.setItem("seenUpcoming", JSON.stringify([...seen]));
+
+    } catch (e) {
+      console.warn("Upcoming media fetch error", e);
+    }
+  }
+
+  fetchUpcomingMedia();
+  setInterval(fetchUpcomingMedia, 15 * 60 * 1000);
+});
 
 </script>
 
@@ -3085,6 +3147,7 @@ upRight.onclick = () => {
 
 </body>
 </html>
+
 
 
 
