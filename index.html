@@ -2749,67 +2749,96 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-/* ---------------- UPCOMING RELEASES (MANUAL SCROLL) ---------------- */
+/* ---------------- UPCOMING RELEASES (AUTO-UPDATING) ---------------- */
 document.addEventListener("DOMContentLoaded", () => {
 
   const upcomingGrid = document.getElementById("upcomingGrid");
   if (!upcomingGrid) return;
 
   const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
+  const AUTO_REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes
+
+  function getToday() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  }
 
   async function fetchUpcomingMedia() {
     try {
-      const today = new Date();
+      const today = getToday();
+      let upcomingList = [];
 
-      // Fetch upcoming movies
-      const moviesRes = await fetch(`https://api.themoviedb.org/3/movie/upcoming?api_key=${TMDB_API_KEY}&language=en-US`);
+      /* -------- MOVIES -------- */
+      const moviesRes = await fetch(
+        `https://api.themoviedb.org/3/movie/upcoming?api_key=${TMDB_API_KEY}&language=en-US&page=1`
+      );
       const moviesData = await moviesRes.json();
 
-      // Fetch upcoming TV series (next season or on air)
-      const tvRes = await fetch(`https://api.themoviedb.org/3/tv/on_the_air?api_key=${TMDB_API_KEY}&language=en-US`);
+      moviesData.results.forEach(m => {
+        if (!m.release_date) return;
+
+        const releaseDate = new Date(m.release_date);
+        if (releaseDate <= today) return;
+
+        upcomingList.push({
+          id: m.id,
+          title: m.title,
+          poster: m.poster_path,
+          mediaType: "Movie",
+          releaseDate: m.release_date
+        });
+      });
+
+      /* -------- TV SERIES -------- */
+      const tvRes = await fetch(
+        `https://api.themoviedb.org/3/tv/on_the_air?api_key=${TMDB_API_KEY}&language=en-US&page=1`
+      );
       const tvData = await tvRes.json();
 
-      const upcomingList = [
-        ...moviesData.results
-          .filter(m => new Date(m.release_date) > today)
-          .map(m => ({
-            id: m.id,
-            title: m.title,
-            poster: m.poster_path,
-            mediaType: "Movie",
-            releaseDate: m.release_date
-          })),
-        ...tvData.results
-          .filter(t => t.first_air_date && new Date(t.first_air_date) > today)
-          .map(t => ({
-            id: t.id,
-            title: t.name,
-            poster: t.poster_path,
-            mediaType: "Series",
-            releaseDate: t.first_air_date
-          }))
-      ];
+      tvData.results.forEach(t => {
+        if (!t.first_air_date) return;
+
+        const releaseDate = new Date(t.first_air_date);
+        if (releaseDate <= today) return;
+
+        upcomingList.push({
+          id: t.id,
+          title: t.name,
+          poster: t.poster_path,
+          mediaType: "Series",
+          releaseDate: t.first_air_date
+        });
+      });
 
       renderUpcoming(upcomingList);
 
     } catch (e) {
-      console.warn("Upcoming media fetch error", e);
+      console.warn("Upcoming auto-update error", e);
     }
   }
 
   function renderUpcoming(list) {
     upcomingGrid.innerHTML = "";
+
+    if (!list.length) {
+      upcomingGrid.innerHTML = `<p class="no-upcoming">No upcoming releases</p>`;
+      return;
+    }
+
     list.forEach(item => {
       if (!item.poster) return;
 
-      const releaseYear = item.releaseDate ? item.releaseDate.slice(0, 4) : "TBA";
+      const releaseYear = new Date(item.releaseDate).getFullYear();
 
       const card = document.createElement("div");
       card.className = "upcoming-card";
       card.innerHTML = `
         <div class="upcoming-image-wrapper">
           <img src="https://image.tmdb.org/t/p/w500${item.poster}" alt="${item.title}">
-          <span class="media-label ${item.mediaType}">${item.mediaType}</span>
+          <span class="media-label ${item.mediaType.toLowerCase()}">
+            ${item.mediaType}
+          </span>
         </div>
         <div class="upcoming-info">
           <div class="upcoming-title">${item.title}</div>
@@ -2820,7 +2849,18 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  /* -------- INITIAL LOAD -------- */
   fetchUpcomingMedia();
+
+  /* -------- AUTO REFRESH -------- */
+  setInterval(fetchUpcomingMedia, AUTO_REFRESH_INTERVAL);
+
+  /* -------- REFRESH WHEN USER RETURNS -------- */
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      fetchUpcomingMedia();
+    }
+  });
 
 });
 
@@ -2972,6 +3012,7 @@ upRight.onclick = () => {
 
 </body>
 </html>
+
 
 
 
