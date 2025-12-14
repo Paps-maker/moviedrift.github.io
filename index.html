@@ -2748,118 +2748,6 @@ style.innerHTML = `
   }
 `;
 document.head.appendChild(style);
-/* ---------------- UPCOMING RELEASES (MANUAL SCROLL) ---------------- */
-document.addEventListener("DOMContentLoaded", () => {
-
-  const upcomingGrid = document.getElementById("upcomingGrid");
-  if (!upcomingGrid) return;
-
-  const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
-  const MAX_PAGES = 10;
-
-  const seen = new Set(JSON.parse(localStorage.getItem("seenUpcoming") || "[]"));
-
-  function todayZero() {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
-
-  function daysLeft(date) {
-    return Math.ceil((new Date(date) - todayZero()) / 86400000);
-  }
-
-  async function fetchUpcomingMedia() {
-    try {
-      const today = todayZero();
-      const upcomingList = [];
-
-      for (let page = 1; page <= MAX_PAGES; page++) {
-
-        // Movies
-        const moviesRes = await fetch(
-          `https://api.themoviedb.org/3/movie/upcoming?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`
-        );
-        const moviesData = await moviesRes.json();
-
-        moviesData.results.forEach(m => {
-          if (!m.release_date) return;
-          if (new Date(m.release_date) <= today) return;
-
-          upcomingList.push({
-            id: "m" + m.id,
-            title: m.title,
-            poster: m.poster_path,
-            mediaType: "Movie",
-            releaseDate: m.release_date
-          });
-        });
-
-        // TV Series
-        const tvRes = await fetch(
-          `https://api.themoviedb.org/3/tv/on_the_air?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`
-        );
-        const tvData = await tvRes.json();
-
-        tvData.results.forEach(t => {
-          if (!t.first_air_date) return;
-          if (new Date(t.first_air_date) <= today) return;
-
-          upcomingList.push({
-            id: "t" + t.id,
-            title: t.name,
-            poster: t.poster_path,
-            mediaType: "Series",
-            releaseDate: t.first_air_date
-          });
-        });
-      }
-
-      renderUpcoming(upcomingList);
-      localStorage.setItem("seenUpcoming", JSON.stringify([...seen]));
-
-    } catch (e) {
-      console.warn("Upcoming media fetch error", e);
-    }
-  }
-
-  function renderUpcoming(list) {
-    upcomingGrid.innerHTML = "";
-
-    list.forEach(item => {
-      if (!item.poster) return;
-
-      const releaseYear = item.releaseDate
-        ? item.releaseDate.slice(0, 4)
-        : "TBA";
-
-      const isNew = !seen.has(item.id);
-
-      const card = document.createElement("div");
-      card.className = "upcoming-card";
-      card.innerHTML = `
-        <div class="upcoming-image-wrapper">
-          <img src="https://image.tmdb.org/t/p/w500${item.poster}" alt="${item.title}">
-          <span class="media-label ${item.mediaType}">${item.mediaType}</span>
-          <span class="countdown-badge">${daysLeft(item.releaseDate)} days left</span>
-          ${isNew ? `<span class="new-badge">NEW</span>` : ``}
-        </div>
-        <div class="upcoming-info">
-          <div class="upcoming-title">${item.title}</div>
-          <div class="upcoming-year">${releaseYear}</div>
-        </div>
-      `;
-
-      upcomingGrid.appendChild(card);
-      seen.add(item.id);
-    });
-  }
-
-  /* -------- AUTO UPDATE -------- */
-  fetchUpcomingMedia();
-  setInterval(fetchUpcomingMedia, 15 * 60 * 1000);
-
-});
 
 /* ---------------- CSS FOR UPCOMING RELEASES ---------------- */
 /* ---------------- CSS FOR UPCOMING RELEASES ---------------- */
@@ -3102,6 +2990,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
