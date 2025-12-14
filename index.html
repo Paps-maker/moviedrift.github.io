@@ -3001,6 +3001,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
 });
 
+const upLeft = document.querySelector(".upcoming-arrow.left");
+const upRight = document.querySelector(".upcoming-arrow.right");
+const scrollStep = 320;
+
+if (upLeft && upRight) {
+  upLeft.onclick = () => upcomingGrid.scrollBy({ left: -scrollStep, behavior: "smooth" });
+  upRight.onclick = () => upcomingGrid.scrollBy({ left: scrollStep, behavior: "smooth" });
+}
 
 
 </script>
@@ -3009,6 +3017,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
