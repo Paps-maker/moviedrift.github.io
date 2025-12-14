@@ -2994,7 +2994,6 @@ upcomingStyle.innerHTML = `
 
   .media-label.Movie { background-color: #00ff66; }
   .media-label.Series { background-color: #3399ff; }
-  .media-label.Animation { background-color: #ffcc00; }
 
   .countdown-badge {
     position: absolute;
@@ -3038,7 +3037,7 @@ upcomingStyle.innerHTML = `
 `;
 document.head.appendChild(upcomingStyle);
 
-/* ---------------- UPCOMING RELEASES (MANUAL SCROLL) ---------------- */
+/* ---------------- UPCOMING RELEASES (HORIZONTAL SCROLL) ---------------- */
 document.addEventListener("DOMContentLoaded", () => {
 
   const upcomingGrid = document.getElementById("upcomingGrid");
@@ -3086,7 +3085,7 @@ document.addEventListener("DOMContentLoaded", () => {
         movies.results.forEach(m => {
           if (m.release_date && new Date(m.release_date) > today) {
             allUpcoming.push({
-              id: "m"+m.id,
+              id: "m" + m.id,
               title: m.title,
               poster: m.poster_path,
               mediaType: "Movie",
@@ -3098,7 +3097,7 @@ document.addEventListener("DOMContentLoaded", () => {
         tv.results.forEach(t => {
           if (t.first_air_date && new Date(t.first_air_date) > today) {
             allUpcoming.push({
-              id: "t"+t.id,
+              id: "t" + t.id,
               title: t.name,
               poster: t.poster_path,
               mediaType: "Series",
@@ -3112,6 +3111,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!item.poster) return;
 
         const isNew = !seen.has(item.id);
+
         const card = document.createElement("div");
         card.className = "upcoming-card";
         card.innerHTML = `
@@ -3126,6 +3126,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <div class="upcoming-year">${item.releaseDate.slice(0,4)}</div>
           </div>
         `;
+
         upcomingGrid.appendChild(card);
         seen.add(item.id);
       });
@@ -3147,6 +3148,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
