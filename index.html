@@ -2289,9 +2289,48 @@ toastContainer.style = `
   max-width: 400px;
 `;
 document.body.appendChild(toastContainer);
-/* Toast CSS */
 const style = document.createElement("style");
 style.innerHTML = `
+/* ================= TOAST CONTAINER ================= */
+#toastContainer {
+  max-height: 70vh;                /* prevent screen overflow */
+  overflow-y: auto;                /* enable scrolling */
+  scrollbar-width: thin;
+  scrollbar-color: #00ff66 #111;
+  padding-right: 4px;
+}
+
+/* Webkit scrollbar */
+#toastContainer::-webkit-scrollbar {
+  width: 6px;
+}
+#toastContainer::-webkit-scrollbar-track {
+  background: #111;
+}
+#toastContainer::-webkit-scrollbar-thumb {
+  background: #00ff66;
+  border-radius: 10px;
+}
+
+/* ================= CLOSE ALL BUTTON ================= */
+.close-all-btn {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: linear-gradient(90deg, #ff4444, #ff0000);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+.close-all-btn:hover {
+  opacity: 0.85;
+}
+
+/* ================= TOAST ================= */
 .professional-toast {
   background: linear-gradient(90deg, #1f1f1f, #333);
   color: #00ff66;
@@ -2302,15 +2341,20 @@ style.innerHTML = `
   font-weight: bold;
   min-width: 250px;
   cursor: pointer;
-  overflow-wrap: break-word;
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 5px;
+  word-break: break-word;           /* prevents overflow text */
+  animation: slideIn 0.4s ease;
 }
+
+/* Hover */
 .professional-toast:hover {
   background: linear-gradient(90deg, #222, #444);
 }
+
+/* Text */
 .professional-toast .toast-title {
   font-size: 14px;
   font-weight: bold;
@@ -2318,6 +2362,8 @@ style.innerHTML = `
 .professional-toast .toast-episode {
   font-size: 13px;
 }
+
+/* Close button */
 .professional-toast .close-btn {
   position: absolute;
   top: 5px;
@@ -2325,6 +2371,19 @@ style.innerHTML = `
   cursor: pointer;
   color: #fff;
   font-weight: bold;
+  font-size: 14px;
+}
+
+/* ================= ANIMATION ================= */
+@keyframes slideIn {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 `;
 document.head.appendChild(style);
@@ -3194,6 +3253,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
