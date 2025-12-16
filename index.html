@@ -2904,43 +2904,166 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ---------------- CSS ---------------- */
-  const style = document.createElement("style");
-  style.innerHTML = `
-  /* ---------------- POSTER GRID ---------------- */
-  .poster-card { flex: 0 0 160px; margin: 0 8px; cursor: pointer; transition: transform 0.3s, box-shadow 0.3s; }
-  .poster-card:hover { transform: scale(1.05); box-shadow: 0 10px 25px rgba(0,255,102,0.5); }
-  .poster-image-wrapper { position: relative; overflow: hidden; border-radius: 8px; }
-  .poster-image-wrapper img { width: 100%; display: block; border-radius: 8px; }
-  .poster-info { margin-top: 5px; text-align: center; font-weight: bold; color: #00ff66; }
-  .media-label { position: absolute; top: 6px; left: 6px; font-size: 0.7rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; color: #000; z-index: 10; }
-  .media-label.Movie { background-color: #00ff66; }
-  .media-label.Series { background-color: #3399ff; }
-  .media-label.Animation { background-color: #ffcc00; }
+  /* ---------------- FULL CSS INJECTION ---------------- */
+const style = document.createElement("style");
+style.innerHTML = `
 
-  /* ---------------- UPCOMING GRID ---------------- */
-  #upcomingGrid { display: flex; overflow-x: auto; gap: 16px; padding: 8px 0; scroll-behavior: smooth; scrollbar-width: none; }
-  #upcomingGrid::-webkit-scrollbar { display: none; }
-  .upcoming-card { flex: 0 0 160px; background-color: #0a0a0a; border-radius: 10px; cursor: pointer; transition: transform 0.3s, box-shadow 0.3s; }
-  .upcoming-card:hover { transform: scale(1.05); box-shadow: 0 10px 25px rgba(0,255,102,0.5); }
-  .upcoming-image-wrapper { position: relative; border-radius: 10px; overflow: hidden; }
-  .upcoming-image-wrapper img { width: 100%; display: block; border-radius: 10px; }
-  .upcoming-info { padding: 8px 4px; text-align: center; }
-  .upcoming-title { font-size: 1rem; font-weight: bold; color: #00ff66; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .upcoming-year { font-size: 0.85rem; color: #00ff66; }
-  .countdown-badge { position: absolute; bottom: 6px; left: 6px; background: #000; color: #00ff66; font-size: 11px; padding: 4px 6px; border-radius: 6px; }
-  .new-badge { position: absolute; top: 6px; right: 6px; background: #ff004c; color: #fff; font-size: 10px; padding: 3px 5px; border-radius: 6px; }
+/* ---------------- POSTER GRID & MEDIA LABELS ---------------- */
+.poster-image-wrapper {
+  position: relative;
+  display: inline-block;
+}
+.media-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #000;
+  z-index: 10;
+}
+.media-label.Movie { background-color: #00ff66; }   /* Green */
+.media-label.Series { background-color: #3399ff; }  /* Blue */
+.media-label.Animation { background-color: #ffcc00; } /* Yellow */
+.poster-card img {
+  width: 100%;
+  display: block;
+  border-radius: 6px;
+}
+.poster-info {
+  margin-top: 5px;
+  text-align: center;
+  font-weight: bold;
+}
 
-  /* ---------------- UPCOMING ARROWS ---------------- */
-  .upcoming-arrow { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); border: none; color: #00ff66; font-size: 22px; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; z-index: 20; }
-  .upcoming-arrow.left { left: -5px; }
-  .upcoming-arrow.right { right: -5px; }
 
-  /* ---------------- RESPONSIVE ---------------- */
-  @media(max-width:1200px){ .upcoming-card,.poster-card{flex:0 0 140px;} }
-  @media(max-width:992px){ .upcoming-card,.poster-card{flex:0 0 130px;} .upcoming-arrow{width:32px;height:32px;font-size:20px;} }
-  @media(max-width:768px){ .upcoming-card,.poster-card{flex:0 0 120px;} }
-  `;
-  document.head.appendChild(style);
+/* ---------------- UPCOMING RELEASES ---------------- */
+#upcomingSection {
+  padding: 20px 15px;
+  background-color: #000;
+  color: #fff;
+  position: relative;
+}
+#upcomingSection h2 {
+  font-size: 2rem;
+  margin-bottom: 15px;
+  font-weight: 900;
+  color: #00ff66;
+  letter-spacing: 1px;
+}
+.upcoming-wrapper { position: relative; }
+#upcomingGrid {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding: 5px 0 10px;
+  scrollbar-width: none;
+}
+#upcomingGrid::-webkit-scrollbar { display: none; }
+.upcoming-card {
+  flex: 0 0 160px;
+  max-width: 160px;
+  background-color: #0a0a0a;
+  border-radius: 10px;
+  transition: transform 0.3s, box-shadow 0.3s;
+  cursor: pointer;
+}
+.upcoming-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 10px 25px rgba(0, 255, 102, 0.5);
+}
+.upcoming-image-wrapper {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.upcoming-image-wrapper img {
+  width: 100%;
+  display: block;
+  border-radius: 10px;
+}
+.upcoming-info {
+  padding: 8px 4px;
+  text-align: center;
+}
+.upcoming-title {
+  font-size: 1rem;
+  font-weight: bold;
+  color: #00ff66;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.upcoming-year { font-size: 0.85rem; color: #00ff66; }
+.media-label {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 5px;
+  color: #000;
+  z-index: 10;
+}
+.media-label.Movie { background-color: #00ff66; }
+.media-label.Series { background-color: #3399ff; }
+.countdown-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: #000;
+  color: #00ff66;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.new-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #ff004c;
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+/* ---------------- UPCOMING GRID ARROWS ---------------- */
+.upcoming-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.7);
+  border: none;
+  color: #00ff66;
+  font-size: 22px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 20;
+}
+.upcoming-arrow.left { left: -5px; }
+.upcoming-arrow.right { right: -5px; }
+
+/* ---------------- RESPONSIVE ---------------- */
+@media (max-width: 1200px) { .upcoming-card { flex: 0 0 140px; max-width: 140px; } }
+@media (max-width: 992px) { .upcoming-card { flex: 0 0 130px; max-width: 130px; } }
+@media (max-width: 992px) { .upcoming-arrow { width: 32px; height: 32px; font-size: 20px; } }
+@media (max-width: 768px) { .upcoming-card { flex: 0 0 120px; max-width: 120px; } #upcomingGrid { gap: 12px; } }
+@media (max-width: 480px) { 
+  .upcoming-card { flex: 0 0 100px; max-width: 100px; } 
+  #upcomingGrid { gap: 8px; padding: 5px 0 8px; } 
+  #upcomingSection h2 { font-size: 1.5rem; } 
+  .upcoming-arrow { width: 28px; height: 28px; font-size: 18px; } 
+}
+
+`;
+document.head.appendChild(style);
 
   /* ---------------- START ---------------- */
   buildPlaylist();
@@ -2954,6 +3077,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
