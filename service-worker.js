@@ -1,23 +1,13 @@
-const CACHE_NAME = "moviedrift-cache-v3"; // increment version
-const CORE_ASSETS = [
-  "./",
-  "./index.html",
-  "./img/logo.png"
-];
-
-// Optional: additional assets to cache slowly in the background
-const ASSETS_TO_CACHE_LATER = [
-  "./css/styles.css",
-  "./js/app.js",
-  "./img/banner1.jpg",
-  "./img/banner2.jpg"
-];
+const CACHE_NAME = "moviedrift-cache-v2"; // increment this when updating
 
 self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      // Cache only core assets first (fast)
-      return cache.addAll(CORE_ASSETS);
+      return cache.addAll([
+        "./",
+        "./index.html",
+        "./img/logo.png"
+      ]);
     })
   );
   self.skipWaiting(); // activate immediately
@@ -34,17 +24,6 @@ self.addEventListener("activate", event => {
     })
   );
   clients.claim(); // take control immediately
-
-  // Cache additional assets slowly in the background
-  caches.open(CACHE_NAME).then(cache => {
-    ASSETS_TO_CACHE_LATER.forEach((url, index) => {
-      setTimeout(() => {
-        fetch(url)
-          .then(resp => cache.put(url, resp))
-          .catch(err => console.warn("Background cache failed:", url, err));
-      }, index * 1500); // stagger requests 1.5s apart
-    });
-  });
 });
 
 // 🔥 IMPORTANT: allow page to tell SW to skip waiting
@@ -55,8 +34,6 @@ self.addEventListener("message", event => {
 });
 
 self.addEventListener("fetch", event => {
-  const url = event.request.url;
-
   // Network-first for main HTML
   if (event.request.mode === "navigate") {
     event.respondWith(
@@ -66,22 +43,25 @@ self.addEventListener("fetch", event => {
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => caches.match(event.request)) // fallback to cache
     );
     return;
   }
 
-  // Cache-first for other requests
+  // Cache-first for other files
   event.respondWith(
     caches.match(event.request).then(response => {
       return (
         response ||
         fetch(event.request).then(networkResponse => {
           const clone = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then(cache =>
+            cache.put(event.request, clone)
+          );
           return networkResponse;
         })
       );
     })
   );
 });
+
