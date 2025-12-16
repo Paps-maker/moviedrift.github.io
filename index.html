@@ -2272,12 +2272,143 @@ function isDownloadable(url) {
 /* ---------------- Episodes fetching ---------------- */
 let episodeUnsub = null;
 
+// ---------------- Episode Notifications System ----------------
+let episodeUnsubscriptions = {}; // store unsub functions per series
+
+/* Toast container */
+const toastContainer = document.createElement("div");
+toastContainer.id = "toastContainer";
+toastContainer.style = `
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+`;
+document.body.appendChild(toastContainer);
+
+/* Toast CSS */
+const style = document.createElement("style");
+style.innerHTML = `
+.professional-toast {
+  background: linear-gradient(90deg, #1f1f1f, #333);
+  color: #00ff66;
+  padding: 12px 20px;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+  font-family: 'Segoe UI', sans-serif;
+  font-weight: bold;
+  min-width: 250px;
+  cursor: pointer;
+  overflow-wrap: break-word;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.professional-toast:hover {
+  background: linear-gradient(90deg, #222, #444);
+}
+.professional-toast .toast-title {
+  font-size: 14px;
+  font-weight: bold;
+}
+.professional-toast .toast-episode {
+  font-size: 13px;
+}
+.professional-toast .close-btn {
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  cursor: pointer;
+  color: #fff;
+  font-weight: bold;
+}
+`;
+document.head.appendChild(style);
+
+/* Show toast notification for new episode */
+function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
+  const now = Date.now();
+  const lastNotified = parseInt(localStorage.getItem(episodeId) || 0);
+
+  // Skip if this episode was already notified in the last 24 hours
+  if (now - lastNotified < 24 * 60 * 60 * 1000) return;
+
+  // Save current notification timestamp
+  localStorage.setItem(episodeId, now);
+  setTimeout(() => localStorage.removeItem(episodeId), 24 * 60 * 60 * 1000);
+
+  const message = `${seriesTitle} - New Episode ${episodeNumber} Added`;
+
+  // Browser notification
+  if (Notification.permission === "granted") {
+    new Notification("New Episode Added", { body: message, icon: "/path/to/icon.png" });
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission().then(permission => {
+      if (permission === "granted") {
+        new Notification("New Episode Added", { body: message, icon: "/path/to/icon.png" });
+      }
+    });
+  }
+
+  // Toast notification
+  const toast = document.createElement("div");
+  toast.className = "professional-toast";
+  toast.innerHTML = `
+    <span class="toast-title">${seriesTitle}</span>
+    <span class="toast-episode">Episode ${episodeNumber} Added</span>
+    <span class="close-btn">&times;</span>
+  `;
+  toastContainer.appendChild(toast);
+
+  toast.querySelector(".close-btn").addEventListener("click", () => toast.remove());
+
+  // Animate in
+  toast.style.opacity = "0";
+  toast.style.transform = "translateX(100%)";
+  setTimeout(() => {
+    toast.style.transition = "all 0.5s ease";
+    toast.style.opacity = "1";
+    toast.style.transform = "translateX(0)";
+  }, 50);
+
+  // Auto-remove toast after 5 seconds
+  setTimeout(() => toast.remove(), 60000);
+}
+
+/* ---------------- Watch for new episodes notifications ---------------- */
+function watchEpisodesNotifications(movieId, seriesTitle) {
+  const episodesColl = collection(db, "movies", movieId, "episodes");
+  const q = query(episodesColl);
+  let knownEpisodes = new Set(); // only track new episodes added after page load
+
+  return onSnapshot(q, snapshot => {
+    snapshot.docChanges().forEach(change => {
+      if (change.type === "added") {
+        const episode = { id: change.doc.id, ...change.doc.data() };
+        const epNumber = episode.epNumber || episode.ep || "";
+
+        if (!knownEpisodes.has(episode.id)) {
+          knownEpisodes.add(episode.id);
+          showEpisodeNotification(seriesTitle, episode.id, epNumber);
+        }
+      }
+    });
+  });
+}
+
+/* ---------------- Existing fetchEpisodesForMovie ---------------- */
 async function fetchEpisodesForMovie(movieId) {
   const episodesColl = collection(db, "movies", movieId, "episodes");
   const snapshot = await getDocs(episodesColl);
   return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+/* ---------------- Existing watchEpisodes ---------------- */
 function watchEpisodes(movieId) {
   const episodesColl = collection(db, "movies", movieId, "episodes");
   const q = query(episodesColl);
@@ -2298,7 +2429,7 @@ function watchEpisodes(movieId) {
     episodeList.innerHTML = `<h4>Episodes</h4><div class="episode-list"></div>`;
     const epContainer = episodeList.querySelector(".episode-list");
 
-    episodes.forEach((ep, index) => {
+    episodes.forEach(ep => {
       const epUrl = ep.fileUrl || ep.url;
       const playable = isDownloadable(epUrl);
 
@@ -2334,63 +2465,9 @@ function watchEpisodes(movieId) {
               font-weight:bold;text-decoration:none;
             ">⬇ Download Episode</a>
           `;
-
-          wrapper.querySelector(".play-btn").addEventListener("click", () => {
-            const video = document.createElement("video");
-            video.src = epUrl;
-            video.controls = true;
-            video.autoplay = true;
-            video.style = "width:100%;max-height:400px;";
-
-            wrapper.innerHTML = "";
-            wrapper.appendChild(video);
-
-            /* ▶ NEXT EPISODE HANDLER (RELIABLE) */
-            let nextShown = false;
-
-            const showNextButton = () => {
-              if (nextShown) return;
-              nextShown = true;
-
-              const nextEpisode = episodes[index + 1];
-              if (!nextEpisode) return;
-
-              const nextBtn = document.createElement("button");
-              nextBtn.innerText = "▶ Next Episode";
-              nextBtn.style = `
-                margin-top:12px;
-                padding:12px 18px;
-                background:#00ff66;
-                border:none;
-                border-radius:8px;
-                font-weight:bold;
-                cursor:pointer;
-              `;
-
-              nextBtn.onclick = () => {
-                video.src = nextEpisode.fileUrl || nextEpisode.url;
-                video.play();
-                nextBtn.remove();
-                nextShown = false;
-              };
-
-              wrapper.appendChild(nextBtn);
-            };
-
-            // Standard ended event
-            video.addEventListener("ended", showNextButton);
-
-            // Fallback for streamed videos
-            video.addEventListener("timeupdate", () => {
-              if (
-                video.duration &&
-                video.currentTime >= video.duration - 0.5
-              ) {
-                showNextButton();
-              }
-            });
+          wrapper.querySelector(".play-btn").addEventListener("click", (e) => {
+            e.target.parentElement.innerHTML = `<video controls autoplay src="${epUrl}" style="width:100%;max-height:400px;"></video>`;
           });
-
         } else {
           wrapper.innerHTML = `<iframe src="${epUrl}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
         }
@@ -2402,6 +2479,29 @@ function watchEpisodes(movieId) {
     });
   });
 }
+
+/* ---------------- Watch all series for notifications ---------------- */
+async function watchAllEpisodeNotifications() {
+  const moviesColl = collection(db, "movies");
+  const moviesSnapshot = await getDocs(moviesColl);
+
+  moviesSnapshot.forEach(movieDoc => {
+    const movieId = movieDoc.id;
+    const movieTitle = movieDoc.data().title || "Untitled Series";
+
+    if (!episodeUnsubscriptions[movieId]) {
+      const unsub = watchEpisodesNotifications(movieId, movieTitle);
+      episodeUnsubscriptions[movieId] = unsub;
+    }
+  });
+}
+
+/* ---------------- Start watching on DOM load ---------------- */
+document.addEventListener("DOMContentLoaded", () => {
+  watchAllEpisodeNotifications(); // <-- notifications added
+});
+
+
 
 
 
@@ -3077,6 +3177,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
