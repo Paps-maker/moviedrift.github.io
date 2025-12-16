@@ -2603,7 +2603,9 @@ document.getElementById("backToTop").addEventListener("click", () => {
 });
 
 /* ---------------- TRAILER SHOWCASE + UPCOMING RELEASES FULL SCRIPT ---------------- */
-/* ---------------- CONFIG ---------------- */
+document.addEventListener("DOMContentLoaded", () => {
+
+  /* ---------------- CONFIG ---------------- */
   const manualTrailers = []; // add manual trailers if needed
   const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
   const tmdbMode = "now_playing";
@@ -2630,7 +2632,7 @@ document.getElementById("backToTop").addEventListener("click", () => {
   /* ---------------- SEARCH TOGGLE ---------------- */
   if (searchInput && trailerSection) {
     searchInput.addEventListener("input", () => {
-      trailerSection.style.display = searchInput.value.trim().length > 0 ? "none" : "block";
+      trailerSection.style.display = searchInput.value.trim() ? "none" : "block";
     });
   }
 
@@ -2653,20 +2655,19 @@ document.getElementById("backToTop").addEventListener("click", () => {
   /* ---------------- YOUTUBE PLAYER ---------------- */
   function loadYTAPI() {
     return new Promise(res => {
-      if (window.YT && window.YT.Player) res();
-      else {
-        const s = document.createElement("script");
-        s.src = "https://www.youtube.com/iframe_api";
-        document.head.appendChild(s);
-        window.onYouTubeIframeAPIReady = res;
-      }
+      if (window.YT && window.YT.Player) return res();
+      const s = document.createElement("script");
+      s.src = "https://www.youtube.com/iframe_api";
+      document.head.appendChild(s);
+      window.onYouTubeIframeAPIReady = res;
     });
   }
 
   async function initPlayer() {
     await loadYTAPI();
     ytPlayer = new YT.Player(playerPlaceholder, {
-      height: "100%", width: "100%",
+      height: "100%",
+      width: "100%",
       videoId: playlist[currentIndex].youtubeId,
       playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, mute: 1 },
       events: { 
@@ -2682,10 +2683,10 @@ document.getElementById("backToTop").addEventListener("click", () => {
     currentIndex = (i + playlist.length) % playlist.length;
     const t = playlist[currentIndex];
     titleEl.innerText = `${t.title} [${t.mediaType}]`;
-    descEl.innerText = t.desc;
+    descEl.innerText = t.desc || "";
     if (ytPlayer) {
       ytPlayer.loadVideoById(t.youtubeId);
-      if (isMuted) ytPlayer.mute();
+      if (isMuted) ytPlayer.mute(); else ytPlayer.unMute();
     } else {
       playerPlaceholder.innerHTML = "";
       await initPlayer();
@@ -2706,11 +2707,12 @@ document.getElementById("backToTop").addEventListener("click", () => {
 
   /* ---------------- COUNTDOWN ---------------- */
   function startCountdown() {
+    if (!playlist.length) return;
     let timeLeft = countdownSeconds;
-    titleEl.innerText = playlist[currentIndex].title + ` (Next in ${timeLeft}s)`;
+    titleEl.innerText = `${playlist[currentIndex].title} (Next in ${timeLeft}s)`;
     countdownTimer = setInterval(() => {
       timeLeft--;
-      titleEl.innerText = playlist[currentIndex].title + ` (Next in ${timeLeft}s)`;
+      titleEl.innerText = `${playlist[currentIndex].title} (Next in ${timeLeft}s)`;
       if (timeLeft <= 0) { stopCountdown(); goNext(); }
     }, 1000);
   }
@@ -2719,7 +2721,6 @@ document.getElementById("backToTop").addEventListener("click", () => {
 
   /* ---------------- PLAYLIST ---------------- */
   async function buildPlaylist() {
-    // Add manual trailers first
     manualTrailers.forEach(t => {
       const id = extractYouTubeId(t.youtube);
       if (id) playlist.push({ youtubeId: id, title: t.title, desc: t.desc, mediaType: t.mediaType || "Movie" });
@@ -2742,17 +2743,15 @@ document.getElementById("backToTop").addEventListener("click", () => {
         ].slice(0, tmdbLimit);
       }
 
-      // Load the first trailer immediately
       if (mediaList.length) await loadTrailer(mediaList[0]);
       finishPlaylist();
 
-      // Load remaining trailers slowly in the background
       for (let i = 1; i < mediaList.length; i++) {
-        setTimeout(() => loadTrailer(mediaList[i]), i * 1500); // 1.5s delay between each
+        setTimeout(() => loadTrailer(mediaList[i]), i * 1500);
       }
 
-      // Fetch posters in the background
       fetchPosters();
+      fetchUpcomingMedia();
     } catch (e) { console.warn("TMDB error", e); }
   }
 
@@ -2766,7 +2765,7 @@ document.getElementById("backToTop").addEventListener("click", () => {
         playlist.push({ youtubeId: vid.key, title: item.title || item.name, desc: item.overview || "", mediaType: item.mediaType });
         if (playlist.length === 1) { renderDots(); loadAtIndex(0); }
       }
-    } catch {}
+    } catch(e){ console.warn("Load trailer error", e); }
   }
 
   function finishPlaylist() {
@@ -2790,20 +2789,27 @@ document.getElementById("backToTop").addEventListener("click", () => {
     });
     updateDots();
   }
-  function updateDots() { dotsWrap.querySelectorAll(".dot").forEach((d,i)=>d.classList.toggle("active",i===currentIndex)); }
+
+  function updateDots() {
+    dotsWrap.querySelectorAll(".dot").forEach((d, i) => d.classList.toggle("active", i === currentIndex));
+  }
 
   function shufflePlaylist() {
     stopCountdown();
-    for (let i = playlist.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[playlist[i],playlist[j]]=[playlist[j],playlist[i]];}
+    for (let i = playlist.length-1; i>0; i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [playlist[i],playlist[j]] = [playlist[j],playlist[i]];
+    }
     renderDots();
     loadAtIndex(0);
   }
+
   const shuffleBtn = document.createElement("button");
   shuffleBtn.innerText = "Shuffle";
   shuffleBtn.className = "trailer-btn";
   shuffleBtn.style.marginLeft = "10px";
   shuffleBtn.onclick = shufflePlaylist;
-  document.querySelector(".trailer-controls").appendChild(shuffleBtn);
+  document.querySelector(".trailer-controls")?.appendChild(shuffleBtn);
 
   /* ---------------- POSTER GRID ---------------- */
   async function fetchPosters() {
@@ -2817,20 +2823,20 @@ document.getElementById("backToTop").addEventListener("click", () => {
         const mediaLabel = item.media_type==="movie"?"Movie":item.media_type==="tv"?"Series":"Animation";
         const card = document.createElement("div");
         card.className="poster-card";
-        card.innerHTML=`<div class="poster-image-wrapper"><img src="https://image.tmdb.org/t/p/w500${item.poster_path}" alt="${item.title||item.name}"><span class="media-label ${mediaLabel}">${mediaLabel}</span></div><div class="poster-info">${item.title||item.name}</div>`;
-        card.onclick=()=>playPosterTrailer(item);
+        card.innerHTML = `<div class="poster-image-wrapper"><img src="https://image.tmdb.org/t/p/w500${item.poster_path}" alt="${item.title||item.name}"><span class="media-label ${mediaLabel}">${mediaLabel}</span></div><div class="poster-info">${item.title||item.name}</div>`;
+        card.onclick = () => playPosterTrailer(item);
         posterGrid.appendChild(card);
       });
-    } catch(e){console.warn("Poster fetch error", e);}
+    } catch(e){ console.warn("Poster fetch error", e); }
   }
 
   async function playPosterTrailer(item){
-    const title=item.title||item.name;
-    let idx=playlist.findIndex(p=>p.title===title);
-    if(idx===-1&&item.id){
+    const title = item.title || item.name;
+    let idx = playlist.findIndex(p => p.title === title);
+    if(idx === -1 && item.id){
       await loadTrailer(item);
       renderDots();
-      idx=playlist.findIndex(p=>p.title===title);
+      idx = playlist.findIndex(p => p.title === title);
     }
     loadAtIndex(idx);
   }
@@ -2840,213 +2846,107 @@ document.getElementById("backToTop").addEventListener("click", () => {
   async function fetchUpcomingMedia(){
     if(!upcomingGrid) return;
     try{
-      const today=todayZero(); const upcomingList=[]; const addedIds=new Set();
-      for(let page=1;page<=10;page++){
-        const [moviesRes,tvRes]=await Promise.all([
+      const today = todayZero();
+      const upcomingList = [];
+      const addedIds = new Set();
+      for(let page=1; page<=10; page++){
+        const [moviesRes,tvRes] = await Promise.all([
           fetch(`https://api.themoviedb.org/3/movie/upcoming?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`),
           fetch(`https://api.themoviedb.org/3/tv/on_the_air?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`)
         ]);
-        const [moviesData,tvData]=await Promise.all([moviesRes.json(),tvRes.json()]);
-        moviesData.results.forEach(m=>{if(!m.release_date||new Date(m.release_date)<=today)return; const id="m"+m.id; if(addedIds.has(id))return; addedIds.add(id); upcomingList.push({id,title:m.title,poster:m.poster_path,mediaType:"Movie",releaseDate:m.release_date});});
-        tvData.results.forEach(t=>{if(!t.first_air_date||new Date(t.first_air_date)<=today)return; const id="t"+t.id;if(addedIds.has(id))return;addedIds.add(id);upcomingList.push({id,title:t.name,poster:t.poster_path,mediaType:"Series",releaseDate:t.first_air_date});});
+        const [moviesData,tvData] = await Promise.all([moviesRes.json(),tvRes.json()]);
+        moviesData.results.forEach(m=>{
+          if(!m.release_date || new Date(m.release_date) <= today) return;
+          const id="m"+m.id; if(addedIds.has(id)) return; addedIds.add(id);
+          upcomingList.push({id,title:m.title,poster:m.poster_path,mediaType:"Movie",releaseDate:m.release_date});
+        });
+        tvData.results.forEach(t=>{
+          if(!t.first_air_date || new Date(t.first_air_date) <= today) return;
+          const id="t"+t.id; if(addedIds.has(id)) return; addedIds.add(id);
+          upcomingList.push({id,title:t.name,poster:t.poster_path,mediaType:"Series",releaseDate:t.first_air_date});
+        });
       }
       renderUpcoming(upcomingList);
       localStorage.setItem("seenUpcoming",JSON.stringify([...seen]));
-    }catch(e){console.warn("Upcoming media fetch error",e);}
+    } catch(e){ console.warn("Upcoming media fetch error",e);}
   }
 
   function renderUpcoming(list){
     if(!upcomingGrid) return;
-    upcomingGrid.innerHTML="";
-    list.forEach(item=>{
-      if(!item.poster)return;
-      const releaseYear=item.releaseDate?item.releaseDate.slice(0,4):"TBA";
-      const isNew=!seen.has(item.id);
-      const card=document.createElement("div");
+    upcomingGrid.innerHTML = "";
+    list.forEach(item => {
+      if(!item.poster) return;
+      const releaseYear = item.releaseDate?item.releaseDate.slice(0,4):"TBA";
+      const isNew = !seen.has(item.id);
+      const card = document.createElement("div");
       card.className="upcoming-card";
-      card.innerHTML=`<div class="upcoming-image-wrapper"><img src="https://image.tmdb.org/t/p/w500${item.poster}" alt="${item.title}"><span class="media-label ${item.mediaType}">${item.mediaType}</span><span class="countdown-badge">${daysLeft(item.releaseDate)} days left</span>${isNew?'<span class="new-badge">NEW</span>':''}</div><div class="upcoming-info"><div class="upcoming-title">${item.title}</div><div class="upcoming-year">${releaseYear}</div></div>`;
+      card.innerHTML = `<div class="upcoming-image-wrapper"><img src="https://image.tmdb.org/t/p/w500${item.poster}" alt="${item.title}"><span class="media-label ${item.mediaType}">${item.mediaType}</span><span class="countdown-badge">${daysLeft(item.releaseDate)} days left</span>${isNew?'<span class="new-badge">NEW</span>':''}</div><div class="upcoming-info"><div class="upcoming-title">${item.title}</div><div class="upcoming-year">${releaseYear}</div></div>`;
       upcomingGrid.appendChild(card);
       seen.add(item.id);
     });
   }
 
-  fetchUpcomingMedia();
-  setInterval(fetchUpcomingMedia,15*60*1000);
+  setInterval(fetchUpcomingMedia, 15*60*1000);
 
   /* ---------------- POSTER / UPCOMING SCROLL ---------------- */
-  const posterGridEl=document.getElementById("posterGrid"), leftArrow=document.querySelector(".left-arrow"), rightArrow=document.querySelector(".right-arrow");
-  if(posterGridEl&&leftArrow&&rightArrow){leftArrow.onclick=()=>posterGridEl.scrollBy({left:-300,behavior:"smooth"}); rightArrow.onclick=()=>posterGridEl.scrollBy({left:300,behavior:"smooth"});}
-  const upLeft=document.querySelector(".upcoming-arrow.left"),upRight=document.querySelector(".upcoming-arrow.right");
-  if(upLeft&&upRight&&upcomingGrid){upLeft.onclick=()=>upcomingGrid.scrollBy({left:-320,behavior:"smooth"}); upRight.onclick=()=>upcomingGrid.scrollBy({left:320,behavior:"smooth"});}
+  const posterGridEl = document.getElementById("posterGrid");
+  const leftArrow = document.querySelector(".left-arrow");
+  const rightArrow = document.querySelector(".right-arrow");
+  if(posterGridEl && leftArrow && rightArrow){
+    leftArrow.onclick = ()=> posterGridEl.scrollBy({left:-300,behavior:"smooth"});
+    rightArrow.onclick = ()=> posterGridEl.scrollBy({left:300,behavior:"smooth"});
+  }
+  const upLeft = document.querySelector(".upcoming-arrow.left");
+  const upRight = document.querySelector(".upcoming-arrow.right");
+  if(upLeft && upRight && upcomingGrid){
+    upLeft.onclick = ()=> upcomingGrid.scrollBy({left:-320,behavior:"smooth"});
+    upRight.onclick = ()=> upcomingGrid.scrollBy({left:320,behavior:"smooth"});
+  }
 
-  
+  /* ---------------- CSS ---------------- */
+  const style = document.createElement("style");
+  style.innerHTML = `
+  /* ---------------- POSTER GRID ---------------- */
+  .poster-card { flex: 0 0 160px; margin: 0 8px; cursor: pointer; transition: transform 0.3s, box-shadow 0.3s; }
+  .poster-card:hover { transform: scale(1.05); box-shadow: 0 10px 25px rgba(0,255,102,0.5); }
+  .poster-image-wrapper { position: relative; overflow: hidden; border-radius: 8px; }
+  .poster-image-wrapper img { width: 100%; display: block; border-radius: 8px; }
+  .poster-info { margin-top: 5px; text-align: center; font-weight: bold; color: #00ff66; }
+  .media-label { position: absolute; top: 6px; left: 6px; font-size: 0.7rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; color: #000; z-index: 10; }
+  .media-label.Movie { background-color: #00ff66; }
+  .media-label.Series { background-color: #3399ff; }
+  .media-label.Animation { background-color: #ffcc00; }
 
+  /* ---------------- UPCOMING GRID ---------------- */
+  #upcomingGrid { display: flex; overflow-x: auto; gap: 16px; padding: 8px 0; scroll-behavior: smooth; scrollbar-width: none; }
+  #upcomingGrid::-webkit-scrollbar { display: none; }
+  .upcoming-card { flex: 0 0 160px; background-color: #0a0a0a; border-radius: 10px; cursor: pointer; transition: transform 0.3s, box-shadow 0.3s; }
+  .upcoming-card:hover { transform: scale(1.05); box-shadow: 0 10px 25px rgba(0,255,102,0.5); }
+  .upcoming-image-wrapper { position: relative; border-radius: 10px; overflow: hidden; }
+  .upcoming-image-wrapper img { width: 100%; display: block; border-radius: 10px; }
+  .upcoming-info { padding: 8px 4px; text-align: center; }
+  .upcoming-title { font-size: 1rem; font-weight: bold; color: #00ff66; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .upcoming-year { font-size: 0.85rem; color: #00ff66; }
+  .countdown-badge { position: absolute; bottom: 6px; left: 6px; background: #000; color: #00ff66; font-size: 11px; padding: 4px 6px; border-radius: 6px; }
+  .new-badge { position: absolute; top: 6px; right: 6px; background: #ff004c; color: #fff; font-size: 10px; padding: 3px 5px; border-radius: 6px; }
 
-  /* ---------------- FULL CSS INJECTION ---------------- */
-const style = document.createElement("style");
-style.innerHTML = `
+  /* ---------------- UPCOMING ARROWS ---------------- */
+  .upcoming-arrow { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); border: none; color: #00ff66; font-size: 22px; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; z-index: 20; }
+  .upcoming-arrow.left { left: -5px; }
+  .upcoming-arrow.right { right: -5px; }
 
-/* ---------------- POSTER GRID & MEDIA LABELS ---------------- */
-.poster-image-wrapper {
-  position: relative;
-  display: inline-block;
-}
-.media-label {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  font-size: 0.7rem;
-  font-weight: bold;
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: #000;
-  z-index: 10;
-}
-.media-label.Movie { background-color: #00ff66; }   /* Green */
-.media-label.Series { background-color: #3399ff; }  /* Blue */
-.media-label.Animation { background-color: #ffcc00; } /* Yellow */
-.poster-card img {
-  width: 100%;
-  display: block;
-  border-radius: 6px;
-}
-.poster-info {
-  margin-top: 5px;
-  text-align: center;
-  font-weight: bold;
-}
-
-
-/* ---------------- UPCOMING RELEASES ---------------- */
-#upcomingSection {
-  padding: 20px 15px;
-  background-color: #000;
-  color: #fff;
-  position: relative;
-}
-#upcomingSection h2 {
-  font-size: 2rem;
-  margin-bottom: 15px;
-  font-weight: 900;
-  color: #00ff66;
-  letter-spacing: 1px;
-}
-.upcoming-wrapper { position: relative; }
-#upcomingGrid {
-  display: flex;
-  gap: 16px;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  padding: 5px 0 10px;
-  scrollbar-width: none;
-}
-#upcomingGrid::-webkit-scrollbar { display: none; }
-.upcoming-card {
-  flex: 0 0 160px;
-  max-width: 160px;
-  background-color: #0a0a0a;
-  border-radius: 10px;
-  transition: transform 0.3s, box-shadow 0.3s;
-  cursor: pointer;
-}
-.upcoming-card:hover {
-  transform: scale(1.05);
-  box-shadow: 0 10px 25px rgba(0, 255, 102, 0.5);
-}
-.upcoming-image-wrapper {
-  position: relative;
-  border-radius: 10px;
-  overflow: hidden;
-}
-.upcoming-image-wrapper img {
-  width: 100%;
-  display: block;
-  border-radius: 10px;
-}
-.upcoming-info {
-  padding: 8px 4px;
-  text-align: center;
-}
-.upcoming-title {
-  font-size: 1rem;
-  font-weight: bold;
-  color: #00ff66;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.upcoming-year { font-size: 0.85rem; color: #00ff66; }
-.media-label {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  font-size: 0.7rem;
-  font-weight: bold;
-  padding: 2px 6px;
-  border-radius: 5px;
-  color: #000;
-  z-index: 10;
-}
-.media-label.Movie { background-color: #00ff66; }
-.media-label.Series { background-color: #3399ff; }
-.countdown-badge {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
-  background: #000;
-  color: #00ff66;
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 6px;
-}
-.new-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: #ff004c;
-  color: #fff;
-  font-size: 11px;
-  padding: 4px 6px;
-  border-radius: 6px;
-}
-
-/* ---------------- UPCOMING GRID ARROWS ---------------- */
-.upcoming-arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(0,0,0,0.7);
-  border: none;
-  color: #00ff66;
-  font-size: 22px;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  cursor: pointer;
-  z-index: 20;
-}
-.upcoming-arrow.left { left: -5px; }
-.upcoming-arrow.right { right: -5px; }
-
-/* ---------------- RESPONSIVE ---------------- */
-@media (max-width: 1200px) { .upcoming-card { flex: 0 0 140px; max-width: 140px; } }
-@media (max-width: 992px) { .upcoming-card { flex: 0 0 130px; max-width: 130px; } }
-@media (max-width: 992px) { .upcoming-arrow { width: 32px; height: 32px; font-size: 20px; } }
-@media (max-width: 768px) { .upcoming-card { flex: 0 0 120px; max-width: 120px; } #upcomingGrid { gap: 12px; } }
-@media (max-width: 480px) { 
-  .upcoming-card { flex: 0 0 100px; max-width: 100px; } 
-  #upcomingGrid { gap: 8px; padding: 5px 0 8px; } 
-  #upcomingSection h2 { font-size: 1.5rem; } 
-  .upcoming-arrow { width: 28px; height: 28px; font-size: 18px; } 
-}
-
-`;
-document.head.appendChild(style);
+  /* ---------------- RESPONSIVE ---------------- */
+  @media(max-width:1200px){ .upcoming-card,.poster-card{flex:0 0 140px;} }
+  @media(max-width:992px){ .upcoming-card,.poster-card{flex:0 0 130px;} .upcoming-arrow{width:32px;height:32px;font-size:20px;} }
+  @media(max-width:768px){ .upcoming-card,.poster-card{flex:0 0 120px;} }
+  `;
+  document.head.appendChild(style);
 
   /* ---------------- START ---------------- */
   buildPlaylist();
 
 });
+
 
 </script>
 
@@ -3054,6 +2954,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
