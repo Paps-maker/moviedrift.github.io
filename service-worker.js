@@ -1,5 +1,6 @@
 const CACHE_NAME = "moviedrift-cache-v3"; // increment version
 const TMDB_CACHE = "tmdb-cache-v1"; // cache for TMDB API
+const TMDB_QUEUE = []; // queue for incremental TMDB updates
 
 self.addEventListener("install", event => {
   event.waitUntil(
@@ -30,27 +31,61 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("message", event => {
   if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
+
+  // Add TMDB URLs to queue for incremental update
+  if (event.data && event.data.type === "QUEUE_TMDB" && Array.isArray(event.data.urls)) {
+    TMDB_QUEUE.push(...event.data.urls);
+    processQueue();
+  }
 });
+
+let isProcessing = false;
+
+// Process TMDB queue one by one
+async function processQueue() {
+  if (isProcessing || TMDB_QUEUE.length === 0) return;
+  isProcessing = true;
+
+  const url = TMDB_QUEUE.shift();
+  try {
+    const response = await fetch(url);
+    const clone = response.clone();
+    const cache = await caches.open(TMDB_CACHE);
+    await cache.put(url, clone);
+
+    // Notify clients that a new TMDB item is available
+    const clientsList = await self.clients.matchAll();
+    clientsList.forEach(client =>
+      client.postMessage({ type: "NEW_TMDB_ITEM", url })
+    );
+  } catch (e) {
+    console.warn("Failed to update TMDB item", url, e);
+  } finally {
+    isProcessing = false;
+    if (TMDB_QUEUE.length > 0) {
+      processQueue();
+    }
+  }
+}
 
 self.addEventListener("fetch", event => {
   const url = event.request.url;
 
-  // TMDB API requests → network-first + cache
+  // TMDB API requests → serve cache first, update one at a time
   if (url.includes("api.themoviedb.org")) {
     event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          const clone = response.clone();
-          caches.open(TMDB_CACHE).then(cache => cache.put(event.request, clone));
-          // Notify clients of new TMDB data
-          self.clients.matchAll().then(clients => {
-            clients.forEach(client =>
-              client.postMessage({ type: "NEW_TMDB_DATA_AVAILABLE" })
-            );
-          });
-          return response;
-        })
-        .catch(() => caches.match(event.request))
+      caches.match(event.request).then(cached => {
+        const fetchPromise = fetch(event.request)
+          .then(response => {
+            const clone = response.clone();
+            caches.open(TMDB_CACHE).then(cache => cache.put(event.request, clone));
+            return response;
+          })
+          .catch(() => cached || Promise.reject("No cache or network"));
+
+        // Return cached response first if exists
+        return cached || fetchPromise;
+      })
     );
     return;
   }
