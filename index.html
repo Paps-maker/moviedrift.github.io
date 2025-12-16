@@ -2603,9 +2603,7 @@ document.getElementById("backToTop").addEventListener("click", () => {
 });
 
 /* ---------------- TRAILER SHOWCASE + UPCOMING RELEASES FULL SCRIPT ---------------- */
-document.addEventListener("DOMContentLoaded", () => {
-
-  /* ---------------- CONFIG ---------------- */
+/* ---------------- CONFIG ---------------- */
   const manualTrailers = []; // add manual trailers if needed
   const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
   const tmdbMode = "now_playing";
@@ -2671,7 +2669,10 @@ document.addEventListener("DOMContentLoaded", () => {
       height: "100%", width: "100%",
       videoId: playlist[currentIndex].youtubeId,
       playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, mute: 1 },
-      events: { onReady: ev => ev.target.playVideo(), onStateChange: ev => { if (ev.data === 0) startCountdown(); } }
+      events: { 
+        onReady: ev => ev.target.playVideo(), 
+        onStateChange: ev => { if (ev.data === 0) startCountdown(); } 
+      }
     });
   }
 
@@ -2695,7 +2696,11 @@ document.addEventListener("DOMContentLoaded", () => {
   function goNext() { stopCountdown(); loadAtIndex(currentIndex + 1); }
   function goPrev() { stopCountdown(); loadAtIndex(currentIndex - 1); }
 
-  muteBtn.onclick = () => { isMuted = !isMuted; if (ytPlayer) (isMuted ? ytPlayer.mute() : ytPlayer.unMute()); muteBtn.innerText = isMuted ? "Unmute" : "Mute"; };
+  muteBtn.onclick = () => { 
+    isMuted = !isMuted; 
+    if (ytPlayer) (isMuted ? ytPlayer.mute() : ytPlayer.unMute()); 
+    muteBtn.innerText = isMuted ? "Unmute" : "Mute"; 
+  };
   nextBtn.onclick = goNext;
   prevBtn.onclick = goPrev;
 
@@ -2714,6 +2719,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   /* ---------------- PLAYLIST ---------------- */
   async function buildPlaylist() {
+    // Add manual trailers first
     manualTrailers.forEach(t => {
       const id = extractYouTubeId(t.youtube);
       if (id) playlist.push({ youtubeId: id, title: t.title, desc: t.desc, mediaType: t.mediaType || "Movie" });
@@ -2735,14 +2741,22 @@ document.addEventListener("DOMContentLoaded", () => {
           ...tvJson.results.map(t => ({ ...t, mediaType: "Series" }))
         ].slice(0, tmdbLimit);
       }
-      await loadNextTrailerData(mediaList, 0);
+
+      // Load the first trailer immediately
+      if (mediaList.length) await loadTrailer(mediaList[0]);
+      finishPlaylist();
+
+      // Load remaining trailers slowly in the background
+      for (let i = 1; i < mediaList.length; i++) {
+        setTimeout(() => loadTrailer(mediaList[i]), i * 1500); // 1.5s delay between each
+      }
+
+      // Fetch posters in the background
       fetchPosters();
     } catch (e) { console.warn("TMDB error", e); }
   }
 
-  async function loadNextTrailerData(list, index) {
-    if (index >= list.length) { finishPlaylist(); return; }
-    const item = list[index];
+  async function loadTrailer(item) {
     try {
       const type = item.mediaType === "Series" ? "tv" : "movie";
       const r = await fetch(`https://api.themoviedb.org/3/${type}/${item.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`);
@@ -2753,7 +2767,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (playlist.length === 1) { renderDots(); loadAtIndex(0); }
       }
     } catch {}
-    await loadNextTrailerData(list, index + 1);
   }
 
   function finishPlaylist() {
@@ -2778,6 +2791,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateDots();
   }
   function updateDots() { dotsWrap.querySelectorAll(".dot").forEach((d,i)=>d.classList.toggle("active",i===currentIndex)); }
+
   function shufflePlaylist() {
     stopCountdown();
     for (let i = playlist.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[playlist[i],playlist[j]]=[playlist[j],playlist[i]];}
@@ -2814,12 +2828,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const title=item.title||item.name;
     let idx=playlist.findIndex(p=>p.title===title);
     if(idx===-1&&item.id){
-      const type=item.media_type==="tv"?"tv":"movie";
-      const r=await fetch(`https://api.themoviedb.org/3/${type}/${item.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`);
-      const json=await r.json();
-      const vid=json.results.find(v=>v.site==="YouTube"&&/trailer/i.test(v.type))||json.results.find(v=>v.site==="YouTube");
-      if(vid){playlist.unshift({youtubeId:vid.key,title,desc:item.overview||"",mediaType:item.media_type==="tv"?"Series":"Movie"});renderDots();loadAtIndex(0);}
-    }else loadAtIndex(idx);
+      await loadTrailer(item);
+      renderDots();
+      idx=playlist.findIndex(p=>p.title===title);
+    }
+    loadAtIndex(idx);
   }
 
   /* ---------------- UPCOMING RELEASES ---------------- */
@@ -2865,6 +2878,9 @@ document.addEventListener("DOMContentLoaded", () => {
   if(posterGridEl&&leftArrow&&rightArrow){leftArrow.onclick=()=>posterGridEl.scrollBy({left:-300,behavior:"smooth"}); rightArrow.onclick=()=>posterGridEl.scrollBy({left:300,behavior:"smooth"});}
   const upLeft=document.querySelector(".upcoming-arrow.left"),upRight=document.querySelector(".upcoming-arrow.right");
   if(upLeft&&upRight&&upcomingGrid){upLeft.onclick=()=>upcomingGrid.scrollBy({left:-320,behavior:"smooth"}); upRight.onclick=()=>upcomingGrid.scrollBy({left:320,behavior:"smooth"});}
+
+  
+
 
   /* ---------------- FULL CSS INJECTION ---------------- */
 const style = document.createElement("style");
@@ -3038,6 +3054,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
