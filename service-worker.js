@@ -1,80 +1,116 @@
-const CACHE_NAME = "moviedrift-cache-v3"; // increment this when updating
-const STATIC_ASSETS = [
-  "./",
-  "./index.html",
-  "./img/logo.png",
-  "./style.css",
-  "./script.js"
-];
+const CACHE_NAME = "moviedrift-cache-v3"; // increment version
+const TMDB_CACHE = "tmdb-cache-v1"; // cache for TMDB API
+const TMDB_QUEUE = []; // queue for incremental updates
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll([
+        "./",
+        "./index.html",
+        "./img/logo.png"
+      ]);
+    })
   );
-  self.skipWaiting(); // activate immediately
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-      )
-    )
+    Promise.all([
+      caches.keys().then(keys => {
+        return Promise.all(
+          keys.filter(key => key !== CACHE_NAME && key !== TMDB_CACHE)
+              .map(key => caches.delete(key))
+        );
+      }),
+      clients.claim()
+    ])
   );
-  clients.claim(); // take control immediately
 });
 
-// 🔥 Allow page to tell SW to skip waiting
 self.addEventListener("message", event => {
-  if (event.data && event.data.type === "SKIP_WAITING") {
-    self.skipWaiting();
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
+  if (event.data && event.data.type === "QUEUE_TMDB") {
+    TMDB_QUEUE.push(...event.data.urls);
+    processQueue();
   }
 });
 
-// ---------------- FETCH ----------------
+let isProcessing = false;
+
+// Process the queue one at a time
+async function processQueue() {
+  if (isProcessing || TMDB_QUEUE.length === 0) return;
+  isProcessing = true;
+
+  const url = TMDB_QUEUE.shift();
+  try {
+    const response = await fetch(url);
+    const clone = response.clone();
+    const cache = await caches.open(TMDB_CACHE);
+    await cache.put(url, clone);
+
+    // Notify clients that this item has new data
+    const clientsList = await self.clients.matchAll();
+    clientsList.forEach(client =>
+      client.postMessage({ type: "NEW_TMDB_ITEM", url })
+    );
+  } catch (e) {
+    console.warn("Failed to update TMDB item", url, e);
+  } finally {
+    isProcessing = false;
+    if (TMDB_QUEUE.length > 0) {
+      // Process the next item
+      processQueue();
+    }
+  }
+}
+
 self.addEventListener("fetch", event => {
-  const request = event.request;
+  const url = event.request.url;
 
-  // 1️⃣ Network-first for navigation (HTML pages)
-  if (request.mode === "navigate") {
+  // TMDB API requests → network-first + cache
+  if (url.includes("api.themoviedb.org")) {
     event.respondWith(
-      fetch(request)
-        .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
+      caches.match(event.request).then(cached => {
+        const fetchPromise = fetch(event.request)
+          .then(response => {
+            const clone = response.clone();
+            caches.open(TMDB_CACHE).then(cache => cache.put(event.request, clone));
+            return response;
+          })
+          .catch(() => cached || Promise.reject("No cache or network"));
 
-  // 2️⃣ Cache-first for static assets
-  if (STATIC_ASSETS.includes(new URL(request.url).pathname)) {
-    event.respondWith(
-      caches.match(request).then(response => response || fetch(request))
-    );
-    return;
-  }
-
-  // 3️⃣ Cache API responses & poster images dynamically
-  if (request.url.includes("api.themoviedb.org") || request.url.includes("image.tmdb.org")) {
-    event.respondWith(
-      caches.match(request).then(cached => {
-        if (cached) return cached;
-        return fetch(request).then(networkResponse => {
-          const clone = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-          return networkResponse;
-        }).catch(() => cached); // fallback if offline
+        // Serve cached first if exists
+        return cached || fetchPromise;
       })
     );
     return;
   }
 
-  // 4️⃣ Fallback for all other requests (cache-first)
+  // Navigation requests → network-first
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Static assets → cache-first
   event.respondWith(
-    caches.match(request).then(response => response || fetch(request))
+    caches.match(event.request).then(response => {
+      return response || fetch(event.request).then(networkResponse => {
+        const clone = networkResponse.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        return networkResponse;
+      });
+    })
   );
 });
