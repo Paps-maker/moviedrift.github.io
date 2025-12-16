@@ -1359,12 +1359,16 @@ a.download-link:hover,
   font-weight: bold;
   color: #fff;
 }
+/* Hide scrollbar in WebKit browsers */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
 
 </style>
 </head>
   <div id="notificationModal" class="notification-modal">
   <div class="notification-content">
-    <img id="notifPoster" src="" alt="Poster">
+    
     <div class="notif-text-wrap">
       <p id="notificationText"></p>
     </div>
@@ -1831,21 +1835,32 @@ function populateFilters() {
 
 let notifTimer = null;
 
-function showNotification(message, poster = "", duration = 60000) {
+function showNotification(htmlContent, duration = 60000) {
   const modal = document.getElementById("notificationModal");
   const text  = document.getElementById("notificationText");
-  const img   = document.getElementById("notifPoster");
 
-  if (!modal || !text || !img) return;
+  if (!modal || !text) return;
 
-  text.textContent = message;
+  /* 🔽 ADDED: scrolling feature with hidden scrollbar (NO logic change) */
+text.style.maxHeight = "320px";
+text.style.overflowY = "auto";
+text.style.paddingRight = "3px";
+text.style.scrollbarWidth = "none";        // Firefox
+text.style.msOverflowStyle = "none";       // IE 10+
+text.style.boxSizing = "border-box";
 
-  if (poster) {
-    img.src = poster;
-    img.style.display = "block";
-  } else {
-    img.style.display = "none";
-  }
+/* hide scrollbar for WebKit browsers (Chrome, Safari, Edge) */
+text.style.setProperty("overflow", "overlay"); // optional smooth scrolling
+text.style.setProperty("scrollbar-width", "none");
+text.style.setProperty("-ms-overflow-style", "none");
+text.style.setProperty("-webkit-overflow-scrolling", "touch");
+text.style.setProperty("--hide-scrollbar", "none");
+
+text.classList.add("hide-scrollbar");
+/* 🔼 END ADDITION */
+
+
+  text.innerHTML = htmlContent; // allow rich HTML
 
   modal.style.display = "block";
 
@@ -1883,6 +1898,10 @@ function renderMovies() {
 
   const now = Date.now();
 
+  /* ===== COLLECT NOTIFICATIONS ===== */
+  const newMovies   = [];
+  const newEpisodes = [];
+
   filtered.forEach((m, index) => {
 
     let badgesHTML = "";
@@ -1890,7 +1909,11 @@ function renderMovies() {
     /* -------- NEW MOVIE -------- */
     if (m.type !== "Series" && now - (m.createdAt || 0) < 86400000) {
       badgesHTML += `<div class="movie-glow-badge fade-out-24h">NEW MOVIE</div>`;
-      showNotification(`New movie added: "${m.title}"`, m.poster);
+
+      newMovies.push({
+        title: m.title,
+        poster: m.poster
+      });
     }
 
     /* -------- HOT -------- */
@@ -1900,10 +1923,10 @@ function renderMovies() {
 
     /* -------- SERIES EPISODES -------- */
     if (m.type === "Series" && m.episodes?.length) {
-      const latest = m.episodes[m.episodes.length - 1];
+      const latest  = m.episodes[m.episodes.length - 1];
       const isFresh = now - (latest.createdAt || now) < 86400000;
-      const ep = latest.ep || 0;
-      const season = latest.season || 1;
+      const ep      = latest.ep || 0;
+      const season  = latest.season || 1;
 
       if (isFresh && !hasWatched(m.id, ep)) {
         badgesHTML += `
@@ -1912,10 +1935,12 @@ function renderMovies() {
           </div>
         `;
 
-        showNotification(
-          `New episode S${season}E${ep} added: "${m.title}"`,
-          m.poster
-        );
+        newEpisodes.push({
+          title: m.title,
+          season,
+          ep,
+          poster: m.poster
+        });
       }
     }
 
@@ -1932,9 +1957,9 @@ function renderMovies() {
         <img class="poster" src="${m.poster || ""}">
       </div>
 
-     <div class="card-body">
-        <h3 class="movie-title">${(m.title||'').replace(/</g,'&lt;')}</h3>
-        <div class="meta">${m.year || ''} · ${(m.genres||[]).join(", ")}</div>
+      <div class="card-body">
+        <h3 class="movie-title">${(m.title || '').replace(/</g,'&lt;')}</h3>
+        <div class="meta">${m.year || ''} · ${(m.genres || []).join(", ")}</div>
         <div class="rating">${ratingText}</div>
 
         <div class="card-actions">
@@ -1947,7 +1972,8 @@ function renderMovies() {
             </svg>
           </button>
 
-          <button class="btn-icon" title="Add to Watchlist" onclick="event.stopPropagation(); protectedAction('add', ${index})">
+          <button class="btn-icon" title="Add to Watchlist"
+            onclick="event.stopPropagation(); protectedAction('add', ${index})">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
               <path d="M19 3H5c-1.1 0-2 .9-2 2v14l8-3 8 3V5
                        c0-1.1-.9-2-2-2zM12 10v4h-2v-4H8v-2h2V6h2v2h2v2h-2z"/>
@@ -1962,8 +1988,8 @@ function renderMovies() {
           </button>
 
         </div>
-      </div>`;
-    
+      </div>
+    `;
 
     card.querySelector(".poster").onclick = () =>
       protectedAction("watch", index);
@@ -1972,6 +1998,45 @@ function renderMovies() {
   });
 
   window.currentFiltered = filtered;
+
+  /* ===== SHOW GROUPED NOTIFICATION WITH POSTERS ===== */
+  if (newMovies.length || newEpisodes.length) {
+
+    let html = `
+      <h3 style="margin-bottom:10px;">🎉 New Content Added</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+    `;
+
+    newMovies.forEach(m => {
+      html += `
+        <div style="display:flex;gap:10px;align-items:center;">
+          <img src="${m.poster || ''}"
+               style="width:45px;height:65px;object-fit:cover;border-radius:6px;">
+          <div>
+            <strong>${m.title}</strong><br>
+            <small>Movie</small>
+          </div>
+        </div>
+      `;
+    });
+
+    newEpisodes.forEach(e => {
+      html += `
+        <div style="display:flex;gap:10px;align-items:center;">
+          <img src="${e.poster || ''}"
+               style="width:45px;height:65px;object-fit:cover;border-radius:6px;">
+          <div>
+            <strong>${e.title}</strong><br>
+            <small>Episode S${e.season}E${e.ep}</small>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `</div>`;
+
+    showNotification(html, 80000);
+  }
 }
 
 /* ================= PROTECTED ACTION ================= */
@@ -1995,10 +2060,16 @@ window.protectedAction = function(action, index) {
     const movie = currentFiltered[index];
     addToWatchlistByFiltered(index);
 
-    showNotification(
-      `"${movie.title}" added to your watchlist`,
-      movie.poster
-    );
+    showNotification(`
+      <div style="display:flex;gap:10px;align-items:center;">
+        <img src="${movie.poster || ''}"
+             style="width:45px;height:65px;object-fit:cover;border-radius:6px;">
+        <div>
+          <strong>${movie.title}</strong><br>
+          <small>Added to watchlist</small>
+        </div>
+      </div>
+    `);
   }
 };
 
@@ -3145,6 +3216,7 @@ if (upLeft && upRight) {
 
 </body>
 </html>
+
 
 
 
