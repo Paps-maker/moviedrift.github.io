@@ -2289,7 +2289,6 @@ toastContainer.style = `
   max-width: 400px;
 `;
 document.body.appendChild(toastContainer);
-
 /* Toast CSS */
 const style = document.createElement("style");
 style.innerHTML = `
@@ -2330,32 +2329,38 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
+
+// Global Close All button (hidden initially)
+const closeAllBtn = document.createElement("button");
+closeAllBtn.innerText = "× Close All";
+closeAllBtn.style = `
+  background: #ff4444;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 5px;
+  display: none; /* hidden by default */
+`;
+closeAllBtn.addEventListener("click", () => {
+  const allToasts = toastContainer.querySelectorAll(".professional-toast");
+  allToasts.forEach(t => t.remove());
+  closeAllBtn.style.display = "none"; // hide button after closing all
+});
+toastContainer.appendChild(closeAllBtn);
+
 /* Show toast notification for new episode */
 function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
   const now = Date.now();
   const lastNotified = parseInt(localStorage.getItem(episodeId) || 0);
 
-  // Skip if this episode was already notified in the last 24 hours
   if (now - lastNotified < 24 * 60 * 60 * 1000) return;
 
-  // Save current notification timestamp
   localStorage.setItem(episodeId, now);
   setTimeout(() => localStorage.removeItem(episodeId), 24 * 60 * 60 * 1000);
 
-  const message = `${seriesTitle} - New Episode ${episodeNumber} Added`;
-
-  // Browser notification
-  if (Notification.permission === "granted") {
-    new Notification("New Episode Added", { body: message, icon: "/path/to/icon.png" });
-  } else if (Notification.permission !== "denied") {
-    Notification.requestPermission().then(permission => {
-      if (permission === "granted") {
-        new Notification("New Episode Added", { body: message, icon: "/path/to/icon.png" });
-      }
-    });
-  }
-
-  // Toast notification
   const toast = document.createElement("div");
   toast.className = "professional-toast";
   toast.innerHTML = `
@@ -2365,7 +2370,16 @@ function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
   `;
   toastContainer.appendChild(toast);
 
-  toast.querySelector(".close-btn").addEventListener("click", () => toast.remove());
+  // Show the Close All button whenever a toast appears
+  closeAllBtn.style.display = "block";
+
+  toast.querySelector(".close-btn").addEventListener("click", () => {
+    toast.remove();
+    // Hide Close All if no more toasts remain
+    if (toastContainer.querySelectorAll(".professional-toast").length === 0) {
+      closeAllBtn.style.display = "none";
+    }
+  });
 
   // Animate in
   toast.style.opacity = "0";
@@ -2376,10 +2390,13 @@ function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
     toast.style.transform = "translateX(0)";
   }, 50);
 
-  // Auto-remove toast after 5 seconds
-  setTimeout(() => toast.remove(), 60000);
+  setTimeout(() => {
+    toast.remove();
+    if (toastContainer.querySelectorAll(".professional-toast").length === 0) {
+      closeAllBtn.style.display = "none";
+    }
+  }, 60000);
 }
-
 /* ---------------- Watch for new episodes notifications ---------------- */
 function watchEpisodesNotifications(movieId, seriesTitle) {
   const episodesColl = collection(db, "movies", movieId, "episodes");
@@ -3177,6 +3194,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
