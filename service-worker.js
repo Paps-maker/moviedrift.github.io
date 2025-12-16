@@ -1,116 +1,131 @@
+/* ---------------- CONFIG ---------------- */
 const CACHE_NAME = "moviedrift-cache-v3"; // increment version
-const TMDB_CACHE = "tmdb-cache-v1"; // cache for TMDB API
-const TMDB_QUEUE = []; // queue for incremental updates
+const TMDB_CACHE = "tmdb-cache-v1";       // cache for TMDB API
+const TMDB_QUEUE = [];                     // in-memory queue for incremental updates
 
+/* ---------------- INSTALL ---------------- */
 self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll([
-        "./",
-        "./index.html",
-        "./img/logo.png"
-      ]);
-    })
-  );
-  self.skipWaiting();
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll([
+      "./",
+      "./index.html",
+      "./img/logo.png",
+      "./offline.html" // optional fallback page
+    ]);
+    self.skipWaiting();
+  })());
 });
 
+/* ---------------- ACTIVATE ---------------- */
 self.addEventListener("activate", event => {
-  event.waitUntil(
-    Promise.all([
-      caches.keys().then(keys => {
-        return Promise.all(
-          keys.filter(key => key !== CACHE_NAME && key !== TMDB_CACHE)
-              .map(key => caches.delete(key))
-        );
-      }),
-      clients.claim()
-    ])
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter(key => key !== CACHE_NAME && key !== TMDB_CACHE)
+        .map(key => caches.delete(key))
+    );
+    await self.clients.claim();
+  })());
 });
 
+/* ---------------- MESSAGE HANDLER ---------------- */
 self.addEventListener("message", event => {
-  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
-  if (event.data && event.data.type === "QUEUE_TMDB") {
-    TMDB_QUEUE.push(...event.data.urls);
-    processQueue();
+  if (!event.data) return;
+
+  switch (event.data.type) {
+    case "SKIP_WAITING":
+      self.skipWaiting();
+      break;
+    case "QUEUE_TMDB":
+      if (event.data.urls?.length) {
+        TMDB_QUEUE.push(...event.data.urls);
+        processQueue();
+      }
+      break;
   }
 });
 
+/* ---------------- TMDB QUEUE PROCESSING ---------------- */
 let isProcessing = false;
 
-// Process the queue one at a time
 async function processQueue() {
   if (isProcessing || TMDB_QUEUE.length === 0) return;
   isProcessing = true;
 
-  const url = TMDB_QUEUE.shift();
-  try {
-    const response = await fetch(url);
-    const clone = response.clone();
-    const cache = await caches.open(TMDB_CACHE);
-    await cache.put(url, clone);
+  while (TMDB_QUEUE.length > 0) {
+    const url = TMDB_QUEUE.shift();
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const clone = response.clone();
+        const cache = await caches.open(TMDB_CACHE);
+        await cache.put(url, clone);
 
-    // Notify clients that this item has new data
-    const clientsList = await self.clients.matchAll();
-    clientsList.forEach(client =>
-      client.postMessage({ type: "NEW_TMDB_ITEM", url })
-    );
-  } catch (e) {
-    console.warn("Failed to update TMDB item", url, e);
-  } finally {
-    isProcessing = false;
-    if (TMDB_QUEUE.length > 0) {
-      // Process the next item
-      processQueue();
+        // Notify clients
+        const clientsList = await self.clients.matchAll();
+        clientsList.forEach(client =>
+          client.postMessage({ type: "NEW_TMDB_ITEM", url })
+        );
+      }
+    } catch (err) {
+      console.warn("Failed to update TMDB item:", url, err);
     }
   }
+
+  isProcessing = false;
 }
 
+/* ---------------- FETCH HANDLER ---------------- */
 self.addEventListener("fetch", event => {
   const url = event.request.url;
 
-  // TMDB API requests → network-first + cache
-  if (url.includes("api.themoviedb.org")) {
-    event.respondWith(
-      caches.match(event.request).then(cached => {
-        const fetchPromise = fetch(event.request)
-          .then(response => {
-            const clone = response.clone();
-            caches.open(TMDB_CACHE).then(cache => cache.put(event.request, clone));
-            return response;
-          })
-          .catch(() => cached || Promise.reject("No cache or network"));
-
-        // Serve cached first if exists
-        return cached || fetchPromise;
-      })
-    );
-    return;
-  }
-
-  // Navigation requests → network-first
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
+  event.respondWith((async () => {
+    // --- TMDB API: network-first, fallback cache ---
+    if (url.includes("api.themoviedb.org")) {
+      try {
+        const response = await fetch(event.request);
+        if (response.ok) {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
-    return;
-  }
+          const cache = await caches.open(TMDB_CACHE);
+          await cache.put(event.request, clone);
+        }
+        return response;
+      } catch {
+        const cached = await caches.match(event.request);
+        return cached || new Response(JSON.stringify({ error: "TMDB offline" }), {
+          headers: { "Content-Type": "application/json" },
+          status: 503
+        });
+      }
+    }
 
-  // Static assets → cache-first
-  event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request).then(networkResponse => {
-        const clone = networkResponse.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        return networkResponse;
-      });
-    })
-  );
+    // --- Navigation requests: network-first, fallback offline page ---
+    if (event.request.mode === "navigate") {
+      try {
+        const response = await fetch(event.request);
+        const clone = response.clone();
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(event.request, clone);
+        return response;
+      } catch {
+        return (await caches.match(event.request)) || (await caches.match("./offline.html"));
+      }
+    }
+
+    // --- Static assets: cache-first, fallback network ---
+    const cached = await caches.match(event.request);
+    if (cached) return cached;
+
+    try {
+      const response = await fetch(event.request);
+      const clone = response.clone();
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(event.request, clone);
+      return response;
+    } catch {
+      return new Response("Offline", { status: 503, statusText: "Offline" });
+    }
+  })());
 });
