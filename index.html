@@ -2075,17 +2075,71 @@ window.protectedAction = function(action, index) {
 
 /* ---------------- Guest modal ---------------- */
 function showGuestModal(actionHint='') {
-  const h = new Date(); let greet='Hello';
-  if(h.getHours()<12) greet='Good morning';
-  else if(h.getHours()<18) greet='Good afternoon';
-  else greet='Good evening';
-  guestGreeting.innerText = `${greet}, Guest!`;
-  guestMessage.innerHTML = `You're browsing in <strong>Guest mode The Black November offer is gone, but Premium Access unlocks full HD movies, streaming, and downloads anytime</strong>. To use ${actionHint ? `<strong>${actionHint}</strong>` : 'premium features'} subscribe.<br><br>Subscription: <strong>150 KSh / month</strong>. Contact our team.`;
-  const phone='+254790427109';
-  waLink.href=`https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent('Hi, I want a MovieDrift premium account')}`;
-  callLink.href=`tel:${phone}`;
-  document.getElementById('guestModal').style.display='flex';
-  guestLoginBtn.onclick = () => { closeModal('guestModal'); openAuthModal(); };
+  const now = new Date();
+  const h = now.getHours();
+  let greet = 'Hello';
+
+  if (h < 12) greet = 'Good morning';
+  else if (h < 18) greet = 'Good afternoon';
+  else greet = 'Good evening';
+
+  guestGreeting.innerText = `${greet}, Guest! 🎄`;
+
+  // 📅 Date logic
+  const month = now.getMonth(); // 11 = December
+  const day = now.getDate();
+  const isChristmas = (month === 11 && day <= 26);
+
+  // 🎄 Christmas messages (rotates daily)
+  const christmasMessages = [
+    "🎄 Merry Christmas & Happy Holidays!",
+    "🎁 Season’s Greetings! Enjoy festive entertainment.",
+    "✨ Celebrate Christmas with unlimited HD movies!"
+  ];
+
+  // 🎆 New Year messages (rotates daily)
+  const newYearMessages = [
+    "🎆 Happy New Year! Start the year with premium movies.",
+    "🥂 Cheers to a New Year of non-stop entertainment!",
+    "🎉 New Year Special — Stream & download anytime!"
+  ];
+
+  // 🔁 Daily rotation using date
+  const messageIndex = day % 3;
+  const selectedMessage = isChristmas
+    ? christmasMessages[messageIndex]
+    : newYearMessages[messageIndex];
+
+  guestMessage.innerHTML = `
+    <strong>${selectedMessage}</strong><br><br>
+    You're browsing in <strong>Guest mode</strong>.  
+    Unlock <strong>Premium Access</strong> for full HD movies, smooth streaming, and unlimited downloads.<br><br>
+    To use ${actionHint ? `<strong>${actionHint}</strong>` : 'premium features'}, please subscribe.<br><br>
+    ${isChristmas ? '🎁 <strong>Christmas Special:</strong>' : '🎆 <strong>New Year Offer:</strong>'}
+    <strong>150 KSh / month</strong><br>
+    Contact our team and enjoy unlimited entertainment!
+  `;
+
+  const phone = '+254790427109';
+  waLink.href = `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(
+    isChristmas
+      ? 'Hi, I want a MovieDrift premium account. Merry Christmas!'
+      : 'Hi, I want a MovieDrift premium account. Happy New Year!'
+  )}`;
+  callLink.href = `tel:${phone}`;
+
+  const modal = document.getElementById('guestModal');
+  modal.style.display = 'flex';
+
+  // ❄ Snowfall only during Christmas
+  if (isChristmas) {
+    startModalSnowfall(modal, 25);
+  }
+
+  guestLoginBtn.onclick = () => {
+    closeModal('guestModal');
+    openAuthModal();
+  };
 }
 
 /* ---------------- Auth system ---------------- */
@@ -3253,6 +3307,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
