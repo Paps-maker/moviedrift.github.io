@@ -1363,6 +1363,23 @@ a.download-link:hover,
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+/* ================= TRENDING MODAL OVERLAY ================= */
+#trendingOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 99999;
+  display: none;
+  overflow-y: auto;
+}
+
+/* Preserve your original section styling */
+#trendingOverlay #trendingSection {
+  margin: 40px auto;
+  width: 95%;
+  max-width: 1400px;
+}
+
 
 </style>
 </head>
@@ -1476,15 +1493,23 @@ a.download-link:hover,
  
 </div>
 
-<section id="trendingSection" class="carousel-section">
-  <h2>Recent uploads</h2>
-  <div class="carousel-wrapper">
-    <button class="left arrow" data-target="trendingCarousel">‹</button>
-    <div class="carousel" id="trendingCarousel"></div>
-    <button class="right arrow" data-target="trendingCarousel">›</button>
-  </div>
-</section>
+<div id="trendingOverlay">
 
+  <!-- ORIGINAL SECTION (UNCHANGED) -->
+  <section id="trendingSection" class="carousel-section">
+    <h2>Recent uploads</h2>
+
+    <div class="carousel-wrapper">
+      <button class="left arrow" data-target="trendingCarousel">‹</button>
+
+      <div class="carousel" id="trendingCarousel"></div>
+
+      <button class="right arrow" data-target="trendingCarousel">›</button>
+    </div>
+
+  </section>
+
+</div>
 <section id="topRatedSection" class="carousel-section">
   <h2>⭐ Top Rated Movies</h2>
   <div class="carousel-wrapper">
@@ -1763,10 +1788,61 @@ onSnapshot(collection(db, "movies"), snapshot => {
   populateFilters();
   renderMovies();
 
-  // Populate Trending
-  const trendingCarousel = document.getElementById("trendingCarousel");
+  /* ================= TRENDING MODAL – FINAL STABLE VERSION WITH ❌ & CLICK-CLOSE ================= */
+
+const trendingOverlay   = document.getElementById("trendingOverlay");
+const trendingSection   = document.getElementById("trendingSection");
+const trendingCarousel  = document.getElementById("trendingCarousel");
+const toggleTrendingBtn = document.getElementById("toggleTrending");
+
+/* ---------- CREATE CLOSE ❌ BUTTON ---------- */
+let closeBtn = document.createElement("button");
+closeBtn.id = "closeTrendingBtn";
+closeBtn.innerText = "✕";
+closeBtn.style.position = "absolute";
+closeBtn.style.top = "12px";
+closeBtn.style.right = "12px";
+closeBtn.style.background = "rgba(0,0,0,0.7)";
+closeBtn.style.color = "#fff";
+closeBtn.style.border = "none";
+closeBtn.style.fontSize = "20px";
+closeBtn.style.cursor = "pointer";
+closeBtn.style.zIndex = "100000";
+closeBtn.style.padding = "4px 8px";
+trendingSection.appendChild(closeBtn);
+
+/* ---------- OPEN ---------- */
+function openTrending() {
+  trendingOverlay.style.display = "block";
+  document.body.style.overflow = "hidden";
+
+  ensureTrendingContent();
+}
+
+/* ---------- CLOSE ---------- */
+function closeTrending() {
+  trendingOverlay.style.display = "none";
+  document.body.style.overflow = "";
+}
+
+/* ---------- ENSURE CONTENT ALWAYS EXISTS ---------- */
+function ensureTrendingContent() {
+  if (!Array.isArray(movies) || movies.length === 0) {
+    setTimeout(ensureTrendingContent, 100);
+    return;
+  }
+
+  populateTrending(); // always rebuild safely
+}
+
+/* ---------- POPULATE TRENDING (UNCHANGED LOGIC + CLOSE ON CLICK) ---------- */
+function populateTrending() {
   trendingCarousel.innerHTML = "";
-  const trending = [...movies].sort((a,b)=> (b.createdAt||0) - (a.createdAt||0)).slice(0,20);
+
+  const trending = [...movies]
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    .slice(0, 20);
+
   trending.forEach(m => {
     const card = document.createElement("div");
     card.className = "card";
@@ -1775,9 +1851,44 @@ onSnapshot(collection(db, "movies"), snapshot => {
       <div class="title">${m.title}</div>
       <div class="rating">⭐ ${m.rating ? m.rating.toFixed(1) : "N/A"}</div>
     `;
-    card.onclick = () => protectedAction("watch", movies.findIndex(x=>x.id===m.id));
+
+    card.onclick = () => {
+      protectedAction("watch", movies.findIndex(x => x.id === m.id));
+      closeTrending(); // 🔥 Close modal when poster is clicked
+    };
+
     trendingCarousel.appendChild(card);
   });
+}
+
+/* ---------- EVENTS ---------- */
+
+/* Open button */
+toggleTrendingBtn.addEventListener("click", e => {
+  e.stopPropagation();
+  openTrending();
+});
+
+/* Close on overlay click */
+trendingOverlay.addEventListener("click", closeTrending);
+
+/* Prevent close when clicking inside */
+trendingSection.addEventListener("click", e => e.stopPropagation());
+
+/* Close via ❌ button */
+closeBtn.addEventListener("click", e => {
+  e.stopPropagation();
+  closeTrending();
+});
+
+/* ESC close */
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && trendingOverlay.style.display === "block") {
+    closeTrending();
+  }
+});
+
+
 
   // Populate Top Rated
   const topRatedCarousel = document.getElementById("topRatedCarousel");
@@ -3307,6 +3418,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
