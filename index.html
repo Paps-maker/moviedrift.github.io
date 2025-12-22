@@ -2667,57 +2667,104 @@ function watchEpisodes(movieId) {
     });
 
     const episodeList = document.getElementById("episodeList");
-    episodeList.innerHTML = `<h4>Episodes</h4><div class="episode-list"></div>`;
-    const epContainer = episodeList.querySelector(".episode-list");
+    episodeList.innerHTML = `<h4>Episodes</h4><div class="episode-seasons"></div>`;
+    const seasonsContainer = episodeList.querySelector(".episode-seasons");
 
+    // Group episodes by season
+    const seasonsMap = {};
     episodes.forEach(ep => {
-      const epUrl = ep.fileUrl || ep.url;
-      const playable = isDownloadable(epUrl);
+      const seasonNum = ep.season || 1;
+      if (!seasonsMap[seasonNum]) seasonsMap[seasonNum] = [];
+      seasonsMap[seasonNum].push(ep);
+    });
 
-      const epDiv = document.createElement("div");
-      epDiv.style = "border:1px solid #333;padding:10px;margin-top:8px;border-radius:6px;";
-      epDiv.innerHTML = `<strong>Episode ${ep.epNumber || ep.ep || ""}: ${ep.title || ""}</strong>
-                         ${ep.description ? `<br><small>${ep.description}</small>` : ""}`;
+    for (const [season, eps] of Object.entries(seasonsMap)) {
+      const seasonDiv = document.createElement("div");
+      seasonDiv.className = "season-group";
+      seasonDiv.innerHTML = `<h5 style="cursor:pointer;background:#222;color:#00ff66;padding:6px 10px;border-radius:6px;margin-top:10px;">
+                                Season ${season} ▼
+                             </h5>`;
+      
+      const epsGrid = document.createElement("div");
+      epsGrid.className = "episodes-grid";
+      epsGrid.style = `
+        display: grid;
+        grid-template-columns: repeat(auto-fill,minmax(150px,1fr));
+        gap: 10px;
+        margin-top: 6px;
+      `;
 
-      epDiv.addEventListener("click", () => {
-        const player = document.getElementById("modalPlayer");
+      eps.forEach(ep => {
+        const epUrl = ep.fileUrl || ep.url;
+        const playable = isDownloadable(epUrl);
 
-        // Remove previous episode video wrapper
-        const existing = player.querySelector(".episode-video-wrapper");
-        if (existing) existing.remove();
+        const epDiv = document.createElement("div");
+        epDiv.style = `
+          border:1px solid #333;padding:8px;border-radius:6px;
+          background:#111;color:#00ff66;
+          cursor:pointer;display:flex;flex-direction:column;gap:4px;
+          overflow: hidden;
+        `;
 
-        const wrapper = document.createElement("div");
-        wrapper.className = "episode-video-wrapper";
-        wrapper.style = "margin-top:10px;position:relative;width:100%;max-height:400px;background:#000;";
+        epDiv.innerHTML = `
+          <strong style="
+            display:block;
+            font-size:14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          ">${ep.title || "Episode " + (ep.epNumber || ep.ep || "")}</strong>
+          ${ep.description ? `<small style="
+            display:block;
+            font-size:12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          ">${ep.description}</small>` : ""}
+          <button style="
+            padding:4px 6px;
+            background:#00ff66;
+            color:#000;
+            border:none;
+            border-radius:4px;
+            font-size:12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          ">▶ Play</button>
+        `;
+        
+        epDiv.querySelector("button").addEventListener("click", (e) => {
+          e.stopPropagation();
+          const player = document.getElementById("modalPlayer");
+          const existing = player.querySelector(".episode-video-wrapper");
+          if (existing) existing.remove();
 
-        if (playable) {
-          wrapper.innerHTML = `
-            <button class="play-btn" style="
-              position:absolute;top:50%;left:50%;
-              transform:translate(-50%,-50%);
-              padding:10px 15px;font-size:16px;
-              border:none;border-radius:6px;
-              background:#00ff66;cursor:pointer;font-weight:bold;
-            ">▶ Play Episode</button>
-            <a href="${epUrl}" download style="
-              display:inline-block;margin-top:8px;
-              background:#00ff66;padding:8px 12px;
-              border-radius:6px;color:black;
-              font-weight:bold;text-decoration:none;
-            ">⬇ Download Episode</a>
-          `;
-          wrapper.querySelector(".play-btn").addEventListener("click", (e) => {
-            e.target.parentElement.innerHTML = `<video controls autoplay src="${epUrl}" style="width:100%;max-height:400px;"></video>`;
-          });
-        } else {
-          wrapper.innerHTML = `<iframe src="${epUrl}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
-        }
+          const wrapper = document.createElement("div");
+          wrapper.className = "episode-video-wrapper";
+          wrapper.style = "margin-top:10px;position:relative;width:100%;max-height:400px;background:#000;";
 
-        player.appendChild(wrapper);
+          if (playable) {
+            wrapper.innerHTML = `<video controls autoplay src="${epUrl}" style="width:100%;max-height:400px;"></video>
+                                 <a href="${epUrl}" download style="display:inline-block;margin-top:8px;background:#00ff66;padding:6px 10px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">⬇ Download</a>`;
+          } else {
+            wrapper.innerHTML = `<iframe src="${epUrl}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
+          }
+          player.appendChild(wrapper);
+        });
+
+        epsGrid.appendChild(epDiv);
       });
 
-      epContainer.appendChild(epDiv);
-    });
+      seasonDiv.appendChild(epsGrid);
+      seasonsContainer.appendChild(seasonDiv);
+
+      // Toggle episodes visibility on season header click
+      const header = seasonDiv.querySelector("h5");
+      header.addEventListener("click", () => {
+        epsGrid.style.display = epsGrid.style.display === "none" ? "grid" : "none";
+      });
+    }
   });
 }
 
@@ -2743,68 +2790,59 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
+/* ---------------- MODAL SCROLL LOCK ---------------- */
+const movieModal = document.getElementById("movieModal");
+function lockBodyScroll() { document.body.style.overflow = "hidden"; }
+function unlockBodyScroll() { document.body.style.overflow = ""; }
 
+const modalObserver = new MutationObserver(() => {
+  if (movieModal.style.display === "flex") lockBodyScroll();
+  else unlockBodyScroll();
+});
+modalObserver.observe(movieModal, { attributes: true, attributeFilter: ["style"] });
 
+const modalCloseBtn = document.getElementById("modalClose");
+if (modalCloseBtn) modalCloseBtn.addEventListener("click", () => unlockBodyScroll());
 
 /* ---------------- VIEW DETAILS ---------------- */
 window.viewDetailsByFiltered = async function (index) {
   const m = window.currentFiltered[index];
-
-  if(currentUser && currentUser.status !== "Paid"){
+  if (currentUser && currentUser.status !== "Paid") {
     alert("⚠ Your account is unpaid. Upgrade to Paid to watch or download.");
     return;
   }
 
   const player = document.getElementById("modalPlayer");
   const episodeList = document.getElementById("episodeList");
-  player.innerHTML = "";
-  episodeList.innerHTML = "";
+  player.innerHTML = ""; episodeList.innerHTML = "";
 
-  // Trailer
   if (m.trailer) {
-    player.innerHTML += `
-      <h4>Trailer</h4>
-      <iframe src="${convertYouTubeLink(m.trailer)}"
-              frameborder="0" allowfullscreen
-              style="width:100%;height:400px;"></iframe>
-    `;
+    player.innerHTML += `<h4>Trailer</h4>
+      <iframe src="${convertYouTubeLink(m.trailer)}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
   }
 
-  // Movie Player
   if (m.fileUrl) {
     const direct = isDownloadable(m.fileUrl);
-
     if (direct) {
-      player.innerHTML += `
-        <h4>Movie</h4>
+      player.innerHTML += `<h4>Movie</h4>
         <video controls src="${m.fileUrl}" style="width:100%;max-height:500px;"></video>
-        <a href="${m.fileUrl}" download
-          style="display:inline-block;margin-top:10px;background:#00ff66;
-                 padding:10px 15px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">
-          ⬇ Download
-        </a>
-      `;
+        <a href="${m.fileUrl}" download style="display:inline-block;margin-top:10px;background:#00ff66;
+           padding:10px 15px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">⬇ Download</a>`;
     } else {
-      player.innerHTML += `
-        <h4>Movie</h4>
-        <iframe src="${m.fileUrl}" frameborder="0" allowfullscreen
-                style="width:100%;height:500px;"></iframe>
-      `;
+      player.innerHTML += `<h4>Movie</h4>
+        <iframe src="${m.fileUrl}" frameborder="0" allowfullscreen style="width:100%;height:500px;"></iframe>`;
     }
   }
 
-  // Episodes
-  if(m.type === "Series"){
-    if(episodeUnsub) episodeUnsub();
+  if (m.type === "Series") {
+    if (episodeUnsub) episodeUnsub();
     episodeUnsub = watchEpisodes(m.id);
   }
 
   document.getElementById("modalTitle").innerText = m.title;
   document.getElementById("modalYear").innerText = "Year: " + m.year;
   document.getElementById("modalGenres").innerText = "Genres: " + (m.genres || []).join(", ");
-  document.getElementById("modalRating").innerText = m.rating
-    ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating * 10)}%)`
-    : "";
+  document.getElementById("modalRating").innerText = m.rating ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating*10)}%)` : "";
   document.getElementById("modalDesc").innerText = m.description || "";
   document.getElementById("movieModal").style.display = "flex";
   document.getElementById("modalAddToList").onclick = () => addToWatchlistByFiltered(index);
@@ -2813,71 +2851,44 @@ window.viewDetailsByFiltered = async function (index) {
 /* ---------------- WATCH BUTTON (with real-time episodes) ---------------- */
 window.viewAndPlayByFiltered = function(index){
   const m = window.currentFiltered[index];
-
-  // CHECK PAYMENT
-  if(currentUser && currentUser.status !== "Paid"){
-    alert("⚠ Your account is unpaid. Upgrade to Paid to watch or download.");
-    return;
-  }
+  if (currentUser && currentUser.status !== "Paid") { alert("⚠ Your account is unpaid. Upgrade to Paid."); return; }
 
   const player = document.getElementById("modalPlayer");
   const episodeList = document.getElementById("episodeList");
+  player.innerHTML = ""; episodeList.innerHTML = "";
 
-  player.innerHTML = "";
-  episodeList.innerHTML = "";
-
-  /* ---------------- TRAILER ---------------- */
   if (m.trailer) {
-    player.innerHTML += `
-      <h4>Trailer</h4>
-      <iframe src="${convertYouTubeLink(m.trailer)}"
-              frameborder="0" allowfullscreen
-              style="width:100%;height:400px;"></iframe>
-    `;
+    player.innerHTML += `<h4>Trailer</h4>
+      <iframe src="${convertYouTubeLink(m.trailer)}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
   }
 
-  /* ---------------- MOVIE / MAIN FILE ---------------- */
   if (m.fileUrl) {
     const direct = isDownloadable(m.fileUrl);
-
     if (direct) {
-      player.innerHTML += `
-        <h4>Movie</h4>
-        <video controls autoplay src="${m.fileUrl}" 
-               style="width:100%;max-height:500px;"></video>
-        <a href="${m.fileUrl}" download
-           style="display:inline-block;margin-top:10px;background:#00ff66;
-                  padding:10px 15px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">
-           ⬇ Download
-        </a>
-      `;
+      player.innerHTML += `<h4>Movie</h4>
+        <video controls autoplay src="${m.fileUrl}" style="width:100%;max-height:500px;"></video>
+        <a href="${m.fileUrl}" download style="display:inline-block;margin-top:10px;background:#00ff66;
+           padding:10px 15px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">⬇ Download</a>`;
     } else {
-      player.innerHTML += `
-        <h4>Movie</h4>
-        <iframe src="${m.fileUrl}" frameborder="0" allowfullscreen
-                style="width:100%;height:500px;"></iframe>
-      `;
+      player.innerHTML += `<h4>Movie</h4>
+        <iframe src="${m.fileUrl}" frameborder="0" allowfullscreen style="width:100%;height:500px;"></iframe>`;
     }
   }
 
-  /* ---------------- REAL-TIME EPISODES LIKE DETAILS ---------------- */
   if (m.type === "Series") {
-    if (episodeUnsub) episodeUnsub();   // stop old listener
-    episodeUnsub = watchEpisodes(m.id); // start new live listener
+    if (episodeUnsub) episodeUnsub();
+    episodeUnsub = watchEpisodes(m.id);
   }
 
-  /* ---------------- POPULATE MODAL DATA ---------------- */
   document.getElementById("modalTitle").innerText = m.title;
   document.getElementById("modalYear").innerText = "Year: " + m.year;
   document.getElementById("modalGenres").innerText = "Genres: " + (m.genres || []).join(", ");
-  document.getElementById("modalRating").innerText = m.rating
-    ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating * 10)}%)`
-    : "";
+  document.getElementById("modalRating").innerText = m.rating ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating*10)}%)` : "";
   document.getElementById("modalDesc").innerText = m.description || "";
-
   document.getElementById("movieModal").style.display = "flex";
   document.getElementById("modalAddToList").onclick = () => addToWatchlistByFiltered(index);
 };
+
 // ---------------- BACK BUTTON HANDLING ----------------
 (function() {
   const modalIds = ["movieModal", "watchlistModal"];
@@ -3418,6 +3429,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
