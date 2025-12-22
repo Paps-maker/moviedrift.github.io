@@ -8,16 +8,17 @@
   "description": "Watch the best and breathtaking entertainment on MovieDrift.",
   "icons": [
     {
-      "src": "img/logo2.png",
+      "src": "img/logo2.jpeg",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "img/logo2.png",
+      "src": "img/logo2.jpeg",
       "sizes": "512x512",
       "type": "image/png"
     }
   ]
 }
+
 
 
