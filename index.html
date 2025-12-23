@@ -1718,7 +1718,21 @@ btn.addEventListener("click", () => {
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getFirestore, collection, doc, onSnapshot, query, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import {
+  getFirestore,
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  getDoc,      // <-- ADD THIS
+  updateDoc,   // <-- you also use updateDoc
+  deleteDoc,   // <-- you also use deleteDoc
+  orderBy
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyD2gkLs17Oa_dxIGu1FpOaDKAvGZwj_EFA",
@@ -3516,6 +3530,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
