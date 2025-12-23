@@ -2270,6 +2270,10 @@ const deviceId = getDeviceId();
 
 /* ---------------- ENFORCE DEVICE LIMIT ---------------- */
 async function enforceDeviceLimit(user, allowForceLogout = false) {
+  // Fetch latest user data to reflect any changes to devicesAllowed
+  const snap = await getDoc(doc(db, "users", user.id));
+  user = { id: snap.id, ...snap.data() };
+
   const allowed = user.devicesAllowed || 1;
   let active = (user.activeDevices || []).filter(d => typeof d === "string" && d.trim() !== "");
 
@@ -2280,7 +2284,7 @@ async function enforceDeviceLimit(user, allowForceLogout = false) {
   if (active.length >= allowed) {
     if (allowForceLogout) {
       // Optional: log out oldest device to free slot
-      const updatedDevices = active.slice(1);
+      const updatedDevices = active.slice(active.length - allowed + 1);
       await updateDoc(doc(db, "users", user.id), { activeDevices: [...updatedDevices, deviceId] });
       return;
     } else {
@@ -2376,13 +2380,11 @@ async function canPlayVideo(userId) {
   return true;
 }
 
-
-
-signInBtn.onclick = ()=>loginUser(authIdentifier.value.trim(),authPassword.value);
-registerBtn.onclick = ()=>registerUser(authIdentifier.value.trim(),authPassword.value);
-openAuthBtn.onclick=()=>openAuthModal();
-guestLoginBtn.onclick=()=>openAuthModal();
-logoutBtn.onclick=()=>{ currentUser=null; saveCurrentUser(); updateAuthUI(); };
+signInBtn.onclick = () => loginUser(authIdentifier.value.trim(), authPassword.value);
+registerBtn.onclick = () => registerUser(authIdentifier.value.trim(), authPassword.value);
+openAuthBtn.onclick = () => openAuthModal();
+guestLoginBtn.onclick = () => openAuthModal();
+logoutBtn.onclick = () => { currentUser = null; saveCurrentUser(); updateAuthUI(); };
 
 /* Modals */
 function openAuthModal(){authModal.style.display='flex';}
@@ -3510,6 +3512,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
