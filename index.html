@@ -2270,12 +2270,12 @@ const deviceId = getDeviceId();
 
 /* ---------------- ENFORCE DEVICE LIMIT ---------------- */
 async function enforceDeviceLimit(user, allowForceLogout = false) {
-  // Fetch latest user data to reflect any changes to devicesAllowed
+  // Always fetch the latest allowed devices from Firestore
   const snap = await getDoc(doc(db, "users", user.id));
-  user = { id: snap.id, ...snap.data() };
+  const latestUser = snap.data();
+  const allowed = latestUser.devicesAllowed || 1;
 
-  const allowed = user.devicesAllowed || 1;
-  let active = (user.activeDevices || []).filter(d => typeof d === "string" && d.trim() !== "");
+  let active = (latestUser.activeDevices || []).filter(d => typeof d === "string" && d.trim() !== "");
 
   // If current device is already active, allow login
   if (active.includes(deviceId)) return;
@@ -2283,8 +2283,8 @@ async function enforceDeviceLimit(user, allowForceLogout = false) {
   // If device limit reached
   if (active.length >= allowed) {
     if (allowForceLogout) {
-      // Optional: log out oldest device to free slot
-      const updatedDevices = active.slice(active.length - allowed + 1);
+      // Log out oldest device to free slot
+      const updatedDevices = active.slice(1);
       await updateDoc(doc(db, "users", user.id), { activeDevices: [...updatedDevices, deviceId] });
       return;
     } else {
@@ -2325,7 +2325,7 @@ async function loginUser(identifier, password) {
     return alert("❌ Your subscription has expired. Please renew.");
   }
 
-  // 5️⃣ Enforce device limit
+  // 5️⃣ Enforce device limit (fetch latest devicesAllowed from admin)
   try {
     await enforceDeviceLimit(user); // Will throw error if limit exceeded
   } catch (err) {
@@ -2367,19 +2367,23 @@ async function logoutOtherDevices() {
 async function canPlayVideo(userId) {
   const snap = await getDoc(doc(db, "users", userId));
   const user = snap.data();
-  const active = user.activeDevices || [];
+  const allowed = user.devicesAllowed || 1;
+  let active = user.activeDevices || [];
 
+  // Check current device
   if (!active.includes(deviceId)) {
-    if (active.length >= user.devicesAllowed) {
+    if (active.length >= allowed) {
       alert("🚫 Device limit reached. Cannot play video. Upgrade subscription or logout from other devices.");
       return false;
     }
     active.push(deviceId);
     await updateDoc(doc(db, "users", userId), { activeDevices: active });
   }
+
   return true;
 }
 
+/* ---------------- BUTTONS ---------------- */
 signInBtn.onclick = () => loginUser(authIdentifier.value.trim(), authPassword.value);
 registerBtn.onclick = () => registerUser(authIdentifier.value.trim(), authPassword.value);
 openAuthBtn.onclick = () => openAuthModal();
@@ -3512,6 +3516,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
