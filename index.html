@@ -2253,22 +2253,127 @@ function showGuestModal(actionHint='') {
   };
 }
 
-/* ---------------- Auth system ---------------- */
-async function loginUser(identifier,password){
-  const usersRef = collection(db,"users");
-  let q=query(usersRef,where("email","==",identifier));
+/* =======================================================
+   👤 USER LOGIN + DEVICE LIMIT + SUBSCRIPTION CHECK
+   ======================================================= */
+
+/* ---------------- DEVICE ID ---------------- */
+function getDeviceId() {
+  let id = localStorage.getItem("deviceId");
+  if (!id) {
+    id = "dev_" + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem("deviceId", id);
+  }
+  return id;
+}
+const deviceId = getDeviceId();
+
+/* ---------------- ENFORCE DEVICE LIMIT ---------------- */
+async function enforceDeviceLimit(user, allowForceLogout = false) {
+  const allowed = user.devicesAllowed || 1;
+  let active = (user.activeDevices || []).filter(d => typeof d === "string" && d.trim() !== "");
+
+  // If current device is already active, allow login
+  if (active.includes(deviceId)) return;
+
+  // If device limit reached
+  if (active.length >= allowed) {
+    if (allowForceLogout) {
+      // Optional: log out oldest device to free slot
+      const updatedDevices = active.slice(1);
+      await updateDoc(doc(db, "users", user.id), { activeDevices: [...updatedDevices, deviceId] });
+      return;
+    } else {
+      // Prevent login and show message
+      throw new Error("🚫 Device limit exceeded. Please upgrade for more devices.");
+    }
+  }
+
+  // Otherwise, add this device to active devices
+  active.push(deviceId);
+  await updateDoc(doc(db, "users", user.id), { activeDevices: active });
+}
+
+/* ---------------- LOGIN FUNCTION ---------------- */
+async function loginUser(identifier, password) {
+  const usersRef = collection(db, "users");
+
+  // 1️⃣ Query by email
+  let q = query(usersRef, where("email", "==", identifier));
   let snapshot = await getDocs(q);
-  if(snapshot.empty){ q=query(usersRef,where("username","==",identifier)); snapshot=await getDocs(q); if(snapshot.empty){return alert("User not found");} }
-  const userDoc=snapshot.docs[0];
-  const user=userDoc.data();
-  if(user.password===password){
-    currentUser={id:userDoc.id,...user};
-    saveCurrentUser();
-    watchUserStatus(); // Start real-time status tracking
-    alert("Logged in successfully");
-    updateAuthUI();
-    closeModal('authModal');
-  } else alert("Incorrect password");
+
+  // 2️⃣ If not found, query by username
+  if (snapshot.empty) {
+    q = query(usersRef, where("username", "==", identifier));
+    snapshot = await getDocs(q);
+    if (snapshot.empty) return alert("❌ User not found");
+  }
+
+  const userDoc = snapshot.docs[0];
+  const user = { id: userDoc.id, ...userDoc.data() };
+
+  // 3️⃣ Check password
+  if (user.password !== password) return alert("❌ Incorrect password");
+
+  // 4️⃣ Check subscription expiry
+  if (Date.now() >= user.subscriptionExpiresAt) {
+    await updateDoc(doc(db, "users", user.id), { status: "Unpaid", activeDevices: [] });
+    return alert("❌ Your subscription has expired. Please renew.");
+  }
+
+  // 5️⃣ Enforce device limit
+  try {
+    await enforceDeviceLimit(user); // Will throw error if limit exceeded
+  } catch (err) {
+    return alert(err.message);
+  }
+
+  // 6️⃣ Save current user locally (for session)
+  currentUser = user;
+  saveCurrentUser();
+
+  // 7️⃣ Start real-time tracking for subscription/status updates
+  watchUserStatus();
+
+  alert(`✅ Logged in successfully as ${user.username}`);
+  updateAuthUI();
+  closeModal('authModal');
+}
+
+/* ---------------- LOGOUT CURRENT DEVICE ---------------- */
+async function logoutCurrentDevice() {
+  if (!currentUser) return;
+  const snap = await getDoc(doc(db, "users", currentUser.id));
+  const user = snap.data();
+  const updated = (user.activeDevices || []).filter(d => d !== deviceId);
+  await updateDoc(doc(db, "users", currentUser.id), { activeDevices: updated });
+  currentUser = null;
+  clearCurrentUser();
+  updateAuthUI();
+}
+
+/* ---------------- LOGOUT OTHER DEVICES ---------------- */
+async function logoutOtherDevices() {
+  if (!currentUser) return;
+  await updateDoc(doc(db, "users", currentUser.id), { activeDevices: [deviceId] });
+  alert("✅ Other devices logged out. You can now log in on this device.");
+}
+
+/* ---------------- CAN PLAY VIDEO ---------------- */
+async function canPlayVideo(userId) {
+  const snap = await getDoc(doc(db, "users", userId));
+  const user = snap.data();
+  const active = user.activeDevices || [];
+
+  if (!active.includes(deviceId)) {
+    if (active.length >= user.devicesAllowed) {
+      alert("🚫 Device limit reached. Cannot play video. Upgrade subscription or logout from other devices.");
+      return false;
+    }
+    active.push(deviceId);
+    await updateDoc(doc(db, "users", userId), { activeDevices: active });
+  }
+  return true;
 }
 
 
@@ -3405,6 +3510,7 @@ document.head.appendChild(style);
 
 </body>
 </html>
+
 
 
 
