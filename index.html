@@ -1400,151 +1400,8 @@ a.download-link:hover,
 .wa-small-btn:hover svg {
   transform: scale(1.1); /* slight hover effect */
 }
-.compare-modal{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.8);
-  display:none;
-  align-items:center;
-  justify-content:center;
-  z-index:99999;
-}
-
-.compare-box{
-  width:420px;
-  max-width:94%;
-  background:#0b0f14;
-  border-radius:18px;
-  padding:18px;
-  color:#fff;
-  animation:slideUp .3s ease;
-}
-
-@keyframes slideUp{
-  from{transform:translateY(40px);opacity:0}
-  to{transform:translateY(0);opacity:1}
-}
-
-.compare-header{
-  display:flex;
-  justify-content:space-between;
-}
-
-.close-btn{
-  font-size:26px;
-  cursor:pointer;
-  color:#00ff66;
-}
-
-/* Posters */
-.poster-compare{
-  display:flex;
-  gap:10px;
-  margin:12px 0;
-}
-
-.poster-compare img{
-  width:50%;
-  border-radius:10px;
-}
-
-/* Movie B buttons */
-.btn-movie-select{
-  background:#111;
-  color:#00ff66;
-  border:1px solid #00ff66;
-  padding:6px 10px;
-  border-radius:6px;
-  margin:4px;
-  cursor:pointer;
-  transition:all .2s ease;
-}
-
-.btn-movie-select:hover{
-  background:#00ff66;
-  color:#000;
-}
-
-/* Stats */
-.stat{
-  margin-top:10px;
-}
-
-.bar{
-  height:6px;
-  background:#222;
-  border-radius:10px;
-  overflow:hidden;
-}
-
-.fill{
-  height:100%;
-  background:#00ff66;
-  width:0;
-  transition:width .8s ease;
-}
-
-/* AI text */
-.ai-box{
-  margin-top:12px;
-  font-size:14px;
-  color:#00ff66;
-  line-height:1.4;
-}
-
-/* Mobile swipe hint */
-@media(max-width:600px){
-  .compare-box::after{
-    content:"⬇ Swipe down to close";
-    display:block;
-    text-align:center;
-    font-size:12px;
-    opacity:.6;
-    margin-top:8px;
-  }
-}
 
 </style>
-  <!-- Comparison Modal -->
-<div id="compareModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:9999;justify-content:center;align-items:center;">
-  <div style="background:#111;color:#fff;padding:20px;border-radius:10px;max-width:800px;width:90%;position:relative;">
-    <button onclick="closeCompareModal()" style="position:absolute;top:10px;right:10px;font-size:20px;color:#00ff66;background:none;border:none;cursor:pointer;">✖</button>
-    <div style="display:flex;gap:20px;flex-wrap:wrap;justify-content:center;">
-      <div id="compareMovie1" style="text-align:center;">
-        <img src="" style="width:150px;height:220px;object-fit:cover;border-radius:8px;">
-        <h3></h3>
-      </div>
-      <div id="compareMovie2" style="text-align:center;">
-        <img src="" style="width:150px;height:220px;object-fit:cover;border-radius:8px;">
-        <h3></h3>
-      </div>
-    </div>
-    <div id="aiExplanation" style="margin-top:20px;font-size:16px;"> will appear here</div>
-    <div style="margin-top:20px;">
-      <div style="background:#333;height:10px;width:100%;border-radius:5px;overflow:hidden;margin-bottom:5px;">
-        <div id="ratingBar" style="height:100%;background:#00ff66;width:0%;transition:width 1s;"></div>
-      </div>
-      <div style="background:#333;height:10px;width:100%;border-radius:5px;overflow:hidden;margin-bottom:5px;">
-        <div id="viewsBar" style="height:100%;background:#ff3366;width:0%;transition:width 1s;"></div>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- Movie Modal -->
-<div class="modal" id="movieModal">
-  <div class="modal-content">
-    <span class="close" onclick="closeModal('movieModal')">&times;</span>
-    <h2 id="modalTitle"></h2>
-    <p id="modalYear"></p>
-    <p id="modalGenres"></p>
-    <p class="rating" id="modalRating"></p>
-    <div id="modalPlayer"></div>
-    <div class="episode-list" id="episodeList"></div>
-    <p id="modalDesc"></p>
-    <button id="modalAddToList" class="btn">➕ Add to Watchlist</button>
-  </div>
-</div>
-
 </head>
   <div id="notificationModal" class="notification-modal">
   <div class="notification-content">
@@ -1619,11 +1476,11 @@ a.download-link:hover,
 <section id="posterShowcase" class="poster-showcase">
   <h2 class="poster-title">Trending</h2>
   <div class="poster-wrapper">
-    <button class="poster-arrow left-arrow">&#10094;</button>
+    <button class="left-arrow poster-arrow">&#10094;</button>
     <div id="posterGrid" class="poster-grid">
       <!-- Poster cards injected by JS -->
     </div>
-    <button class="poster-arrow right-arrow">&#10095;</button>
+    <button class="right-arrow poster-arrow">&#10095;</button>
   </div>
 </section>
 
@@ -1653,9 +1510,9 @@ a.download-link:hover,
   <h2>Upcoming Releases</h2>
 
   <div class="upcoming-wrapper">
-    <button class="upcoming-arrow left">&#10094;</button>
+    <button class="left upcoming-arrow">&#10094;</button>
     <div id="upcomingGrid"></div>
-    <button class="upcoming-arrow right">&#10095;</button>
+    <button class="right upcoming-arrow">&#10095;</button>
   </div>
 </section>
 
@@ -1724,6 +1581,21 @@ btn.addEventListener("click", () => {
 </script>
 
 
+<!-- Movie Modal -->
+<div class="modal" id="movieModal">
+  <div class="modal-content">
+    <span class="close" onclick="closeModal('movieModal')">&times;</span>
+    <h2 id="modalTitle"></h2>
+    <p id="modalYear"></p>
+    <p id="modalGenres"></p>
+    <p class="rating" id="modalRating"></p>
+    <div id="modalPlayer"></div>
+    <div class="episode-list" id="episodeList"></div>
+    <p id="modalDesc"></p>
+    <button id="modalAddToList" class="btn">➕ Add to Watchlist</button>
+  </div>
+</div>
+
 <!-- Guest Modal -->
 <div class="modal" id="guestModal">
   <div class="modal-content">
@@ -1747,7 +1619,31 @@ btn.addEventListener("click", () => {
     <div class="movie-list" id="watchlistContainer"></div>
   </div>
 </div>
-
+<!-- Comparison Modal -->
+<div id="compareModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:9999;justify-content:center;align-items:center;">
+  <div style="background:#111;color:#fff;padding:20px;border-radius:10px;max-width:800px;width:90%;position:relative;">
+    <button onclick="closeCompareModal()" style="position:absolute;top:10px;right:10px;font-size:20px;color:#00ff66;background:none;border:none;cursor:pointer;">✖</button>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;justify-content:center;">
+      <div id="compareMovie1" style="text-align:center;">
+        <img src="" style="width:150px;height:220px;object-fit:cover;border-radius:8px;">
+        <h3></h3>
+      </div>
+      <div id="compareMovie2" style="text-align:center;">
+        <img src="" style="width:150px;height:220px;object-fit:cover;border-radius:8px;">
+        <h3></h3>
+      </div>
+    </div>
+    <div id="aiExplanation" style="margin-top:20px;font-size:16px;">🤖 AI explanation will appear here</div>
+    <div style="margin-top:20px;">
+      <div style="background:#333;height:10px;width:100%;border-radius:5px;overflow:hidden;margin-bottom:5px;">
+        <div id="ratingBar" style="height:100%;background:#00ff66;width:0%;transition:width 1s;"></div>
+      </div>
+      <div style="background:#333;height:10px;width:100%;border-radius:5px;overflow:hidden;margin-bottom:5px;">
+        <div id="viewsBar" style="height:100%;background:#ff3366;width:0%;transition:width 1s;"></div>
+      </div>
+    </div>
+  </div>
+</div>
 <!-- Auth Modal -->
 <div class="modal" id="authModal">
   <div class="modal-content">
@@ -2228,7 +2124,7 @@ function renderMovies() {
       ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating * 10)}%)`
       : "";
 
-     const card = document.createElement("div");
+    const card = document.createElement("div");
 card.className = "card";
 
 card.innerHTML = `
@@ -3692,6 +3588,82 @@ document.head.appendChild(style);
   buildPlaylist();
 
 });
+
+let compareFirstMovie = null; // stores first selected movie index
+
+function renderMovies() {
+  const grid = document.getElementById("grid");
+  const searchText = document.getElementById("search").value.toLowerCase();
+  const selectedGenre = genreFilter.value;
+  const selectedYear = yearFilter.value;
+  const selectedType = document.getElementById("typeFilter").value;
+
+  grid.innerHTML = "";
+
+  const filtered = movies.filter(m => {
+    const matchesSearch = (m.title || "").toLowerCase().includes(searchText);
+    const matchesGenre = !selectedGenre || (m.genres && m.genres.includes(selectedGenre));
+    const matchesYear  = !selectedYear || m.year == selectedYear;
+    const matchesType  = !selectedType || m.type === selectedType || !m.type;
+    return matchesSearch && matchesGenre && matchesYear && matchesType;
+  });
+
+  const now = Date.now();
+
+  filtered.forEach((m, index) => {
+    let badgesHTML = "";
+
+    if (m.type !== "Series" && now - (m.createdAt || 0) < 86400000) {
+      badgesHTML += `<div class="movie-glow-badge fade-out-24h">NEW MOVIE</div>`;
+    }
+
+    if (m.views && m.views >= 1000) {
+      badgesHTML += `<div class="hot-badge">HOT</div>`;
+    }
+
+    if (m.type === "Series" && m.episodes?.length) {
+      const latest  = m.episodes[m.episodes.length - 1];
+      const isFresh = now - (latest.createdAt || now) < 86400000;
+      const ep      = latest.ep || 0;
+      const season  = latest.season || 1;
+      if (isFresh && !hasWatched(m.id, ep)) {
+        badgesHTML += `<div class="new-badge fade-out-24h">NEW Episode S${season}E${ep}</div>`;
+      }
+    }
+
+    const ratingText = m.rating ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating * 10)}%)` : "";
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <div class="poster-wrapper" style="position:relative;">
+        <div class="badges-container">${badgesHTML}</div>
+        <img class="poster" src="${m.poster || ""}">
+        <div class="compare-circle" onclick="selectSecondMovie(${index})" title="Select for comparison"></div>
+      </div>
+
+      <div class="card-body">
+        <h3 class="movie-title">${(m.title || '').replace(/</g,'&lt;')}</h3>
+        <div class="meta">${m.year || ''} · ${(m.genres || []).join(", ")}</div>
+        <div class="rating">${ratingText}</div>
+
+        <div class="card-actions">
+          <button class="btn-icon" title="Details" onclick="protectedAction('details', ${index})">Details</button>
+          <button class="btn-icon" title="Add to Watchlist" onclick="event.stopPropagation(); protectedAction('add', ${index})">Add</button>
+          <button class="btn-icon" title="Watch Movie" onclick="protectedAction('watch', ${index})">Watch</button>
+          <button class="btn-icon" title="Compare" onclick="event.stopPropagation(); openCompare(${index})">Compare</button>
+        </div>
+      </div>
+    `;
+
+    card.querySelector(".poster").onclick = () => protectedAction("watch", index);
+    grid.appendChild(card);
+  });
+
+  window.currentFiltered = filtered;
+}
+
 // Open first movie or second movie selection
 function openCompare(index) {
   const selectedMovie = window.currentFiltered[index];
@@ -3802,103 +3774,9 @@ function closeCompareModal() {
   document.getElementById("compareModal").style.display = "none";
 }
 
-
-
 </script>
 
 
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
