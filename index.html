@@ -3953,7 +3953,7 @@ const day = today.getDate();
 const year = today.getFullYear();
 
 // Show overlay only between Jan 1 - Jan 20
-if(month === 0 && day <= 20) {
+if(month === 0 && day <= 10) {
   yearText.textContent = year; // update year dynamically
 
   const storageKey = `newYearShown-${year}`;
@@ -4111,6 +4111,7 @@ animateCF();
 
 </body>
 </html>
+
 
 
 
