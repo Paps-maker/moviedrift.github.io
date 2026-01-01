@@ -3948,13 +3948,13 @@ function closeCompareModal() {
 const overlay = document.getElementById('newYearOverlay');
 const yearText = document.getElementById('yearText');
 const today = new Date();
-const month = today.getMonth(); // 0=Jan, 1=Feb...
+const month = today.getMonth(); // 0=Jan
 const day = today.getDate();
 const year = today.getFullYear();
 
 // Show overlay only between Jan 1 - Jan 20
 if(month === 0 && day <= 10) {
-  yearText.textContent = year; // update year dynamically
+  yearText.textContent = year; // dynamic year
 
   const storageKey = `newYearShown-${year}`;
   if(!localStorage.getItem(storageKey)) {
@@ -3973,17 +3973,33 @@ if(month === 0 && day <= 10) {
   overlay.remove();
 }
 
-/* ================= FIREWORKS ================= */
+/* ===== RESPONSIVE TEXT ===== */
+function scaleText() {
+  const textElem = document.getElementById('newYearText');
+  const width = window.innerWidth;
+  if(width < 400){
+    textElem.style.fontSize = '1.8rem';
+  } else if(width < 768){
+    textElem.style.fontSize = '2.5rem';
+  } else {
+    textElem.style.fontSize = '3rem';
+  }
+}
+scaleText();
+window.addEventListener('resize', scaleText);
+
+/* ===== FIREWORKS CANVAS ===== */
 const canvasFW = document.getElementById('fireworks');
 const ctxFW = canvasFW.getContext('2d');
-canvasFW.width = window.innerWidth;
-canvasFW.height = window.innerHeight;
 
-window.addEventListener('resize', () => {
+function resizeFW() {
   canvasFW.width = window.innerWidth;
   canvasFW.height = window.innerHeight;
-});
+}
+resizeFW();
+window.addEventListener('resize', resizeFW);
 
+/* ===== FIREWORK & PARTICLE ===== */
 class Firework {
   constructor() {
     this.x = Math.random() * canvasFW.width;
@@ -3991,15 +4007,17 @@ class Firework {
     this.targetY = Math.random() * canvasFW.height / 2;
     this.radius = 2;
     this.color = `hsl(${Math.random()*360},100%,60%)`;
-    this.speed = Math.random()*3+3;
+    this.speed = Math.random() * 3 + 3;
     this.trail = [];
   }
   update() {
     this.trail.push({x:this.x,y:this.y});
     if(this.trail.length>10) this.trail.shift();
     this.y -= this.speed;
-    if(this.y<=this.targetY){
-      for(let i=0;i<30;i++) particles.push(new Particle(this.x,this.y,this.color));
+    if(this.y <= this.targetY){
+      // Reduce number of particles for mobile
+      const count = window.innerWidth < 500 ? 15 : 30;
+      for(let i=0;i<count;i++) particles.push(new Particle(this.x,this.y,this.color));
       return true;
     }
     return false;
@@ -4007,14 +4025,14 @@ class Firework {
   draw() {
     ctxFW.beginPath();
     for(let i=0;i<this.trail.length;i++){
-      const t=this.trail[i];
+      const t = this.trail[i];
       ctxFW.globalAlpha = i/this.trail.length;
       ctxFW.fillStyle = this.color;
       ctxFW.beginPath();
       ctxFW.arc(t.x,t.y,this.radius,0,Math.PI*2);
       ctxFW.fill();
     }
-    ctxFW.globalAlpha=1;
+    ctxFW.globalAlpha = 1;
     ctxFW.beginPath();
     ctxFW.arc(this.x,this.y,this.radius,0,Math.PI*2);
     ctxFW.fillStyle = this.color;
@@ -4026,7 +4044,7 @@ class Firework {
 
 class Particle {
   constructor(x,y,color){
-    this.x=x;this.y=y;
+    this.x=x; this.y=y;
     this.radius=Math.random()*2+1;
     this.color=color;
     this.velocityX=(Math.random()-0.5)*6;
@@ -4049,29 +4067,31 @@ function animateFW(){
   if(!document.getElementById('newYearOverlay')) return;
   ctxFW.fillStyle='rgba(0,0,0,0.2)';
   ctxFW.fillRect(0,0,canvasFW.width,canvasFW.height);
-  if(Math.random()<0.05) fireworks.push(new Firework());
+  if(Math.random() < 0.05) fireworks.push(new Firework());
   fireworks = fireworks.filter(fw=>{ fw.draw(); return !fw.update(); });
   particles = particles.filter(p=>{ p.draw(); p.update(); return p.life>0; });
   requestAnimationFrame(animateFW);
 }
 animateFW();
 
-/* ================= CONFETTI ================= */
+/* ===== CONFETTI CANVAS ===== */
 const canvasCF = document.getElementById('confetti');
 const ctxCF = canvasCF.getContext('2d');
-canvasCF.width = window.innerWidth;
-canvasCF.height = window.innerHeight;
 
-window.addEventListener('resize', () => {
+function resizeCF() {
   canvasCF.width = window.innerWidth;
   canvasCF.height = window.innerHeight;
-});
+}
+resizeCF();
+window.addEventListener('resize', resizeCF);
 
 class Confetti {
   constructor(){
     this.x=Math.random()*canvasCF.width;
     this.y=Math.random()*-canvasCF.height;
     this.size=Math.random()*8+4;
+    // smaller size on mobile
+    if(window.innerWidth < 500) this.size = Math.random()*5+2;
     this.color=`hsl(${Math.random()*360},100%,60%)`;
     this.speedY=Math.random()*3+2;
     this.speedX=(Math.random()-0.5)*2;
@@ -4097,7 +4117,9 @@ class Confetti {
 }
 
 let confettis=[];
-for(let i=0;i<150;i++) confettis.push(new Confetti());
+for(let i=0;i<150;i++){
+  confettis.push(new Confetti());
+}
 
 function animateCF(){
   if(!document.getElementById('newYearOverlay')) return;
@@ -4111,6 +4133,7 @@ animateCF();
 
 </body>
 </html>
+
 
 
 
