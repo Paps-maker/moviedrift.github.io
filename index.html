@@ -1418,8 +1418,63 @@ a.download-link:hover,
   border-radius: 50%;
   padding: 6px;
 }
+/* Full screen overlay */
+#newYearOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000; /* dark background like MovieDrift */
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 2s ease;
+}
+
+/* Fireworks canvas */
+#fireworks {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* New Year Text - MovieDrift style */
+#newYearText {
+  font-size: 3rem;
+  font-weight: bold;
+  color: #00ff00; /* green text */
+  text-shadow: 
+      0 0 10px #00ff00,
+      0 0 20px #00ff00,
+      0 0 30px #00ff00,
+      0 0 40px #00ff00,
+      0 0 50px #00ff00,
+      0 0 60px #00ff00;
+  animation: glow 1.5s infinite alternate;
+  font-family: 'Arial Black', sans-serif;
+  z-index: 1;
+}
+
+/* Glow animation */
+@keyframes glow {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
 
 </style>
+  <!-- New Year Overlay -->
+<div id="newYearOverlay">
+  <canvas id="fireworks"></canvas>
+  <div id="newYearText"> Happy New Year 2026 </div>
+</div>
+
 </head>
   <div id="notificationModal" class="notification-modal">
   <div class="notification-content">
@@ -3885,8 +3940,121 @@ function closeCompareModal() {
 
 </script>
 
+<script>
+// ===== Show overlay only once per user =====
+if (!localStorage.getItem('newYearShown')) {
+  const overlay = document.getElementById('newYearOverlay');
+  overlay.style.display = 'flex';
+  localStorage.setItem('newYearShown', 'true');
+
+  // Fade out overlay after 10 seconds
+  setTimeout(() => {
+    overlay.style.opacity = 0;
+    // Remove overlay from DOM after fade-out
+    setTimeout(() => overlay.remove(), 2000);
+  }, 10000);
+} else {
+  document.getElementById('newYearOverlay').remove();
+}
+
+// ===== Fireworks Canvas Setup =====
+const canvas = document.getElementById('fireworks');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+window.addEventListener('resize', () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+});
+
+// ===== Firework & Particle Classes =====
+class Firework {
+  constructor() {
+    this.x = Math.random() * canvas.width;
+    this.y = canvas.height;
+    this.targetY = Math.random() * canvas.height / 2;
+    this.radius = 2;
+    this.color = `hsl(${Math.random() * 360}, 100%, 60%)`;
+    this.speed = Math.random() * 3 + 3;
+  }
+
+  update() {
+    this.y -= this.speed;
+    if (this.y <= this.targetY) {
+      for (let i = 0; i < 30; i++) {
+        particles.push(new Particle(this.x, this.y, this.color));
+      }
+      return true;
+    }
+    return false;
+  }
+
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+  }
+}
+
+class Particle {
+  constructor(x, y, color) {
+    this.x = x;
+    this.y = y;
+    this.radius = Math.random() * 2 + 1;
+    this.color = color;
+    this.velocityX = (Math.random() - 0.5) * 6;
+    this.velocityY = (Math.random() - 0.5) * 6;
+    this.life = 60;
+  }
+
+  update() {
+    this.x += this.velocityX;
+    this.y += this.velocityY;
+    this.life--;
+  }
+
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+  }
+}
+
+let fireworks = [];
+let particles = [];
+
+function animate() {
+  if (!document.getElementById('newYearOverlay')) return; // stop if overlay removed
+
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (Math.random() < 0.05) {
+    fireworks.push(new Firework());
+  }
+
+  fireworks = fireworks.filter(fw => {
+    fw.draw();
+    return !fw.update();
+  });
+
+  particles = particles.filter(p => {
+    p.draw();
+    p.update();
+    return p.life > 0;
+  });
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
 
 
 </body>
 </html>
+
 
