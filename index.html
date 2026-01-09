@@ -2952,9 +2952,7 @@ function convertYouTubeLink(url) {
     if (url.includes("youtu.be/"))
       return `https://www.youtube.com/embed/${url.split("youtu.be/")[1].split("?")[0]}?rel=0`;
     return url;
-  } catch {
-    return url;
-  }
+  } catch { return url; }
 }
 
 function isDownloadable(url) {
@@ -2963,6 +2961,15 @@ function isDownloadable(url) {
 
 /* ---------------- Episodes fetching ---------------- */
 let episodeUnsub = null;
+let currentEpisodeList = [];
+let currentEpisodeIndex = 0;
+let playbackPositions = {}; // Stores time per episode
+
+// Load saved playback positions from localStorage
+if (localStorage.getItem("playbackPositions")) {
+  try { playbackPositions = JSON.parse(localStorage.getItem("playbackPositions")); } 
+  catch { playbackPositions = {}; }
+}
 
 // ---------------- Episode Notifications System ----------------
 let episodeUnsubscriptions = {}; // store unsub functions per series
@@ -2981,107 +2988,28 @@ toastContainer.style = `
   max-width: 400px;
 `;
 document.body.appendChild(toastContainer);
+
 const style = document.createElement("style");
 style.innerHTML = `
-/* ================= TOAST CONTAINER ================= */
-#toastContainer {
-  max-height: 70vh;                /* prevent screen overflow */
-  overflow-y: auto;                /* enable scrolling */
-  scrollbar-width: thin;
-  scrollbar-color: #00ff66 #111;
-  padding-right: 4px;
-}
-
-/* Webkit scrollbar */
-#toastContainer::-webkit-scrollbar {
-  width: 6px;
-}
-#toastContainer::-webkit-scrollbar-track {
-  background: #111;
-}
-#toastContainer::-webkit-scrollbar-thumb {
-  background: #00ff66;
-  border-radius: 10px;
-}
-
-/* ================= CLOSE ALL BUTTON ================= */
-.close-all-btn {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  background: linear-gradient(90deg, #ff4444, #ff0000);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-weight: bold;
-  cursor: pointer;
-  margin-bottom: 6px;
-}
-.close-all-btn:hover {
-  opacity: 0.85;
-}
-
-/* ================= TOAST ================= */
-.professional-toast {
-  background: linear-gradient(90deg, #1f1f1f, #333);
-  color: #00ff66;
-  padding: 12px 20px;
-  border-radius: 10px;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.4);
-  font-family: 'Segoe UI', sans-serif;
-  font-weight: bold;
-  min-width: 250px;
-  cursor: pointer;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  word-break: break-word;           /* prevents overflow text */
-  animation: slideIn 0.4s ease;
-}
-
-/* Hover */
-.professional-toast:hover {
-  background: linear-gradient(90deg, #222, #444);
-}
-
-/* Text */
-.professional-toast .toast-title {
-  font-size: 14px;
-  font-weight: bold;
-}
-.professional-toast .toast-episode {
-  font-size: 13px;
-}
-
-/* Close button */
-.professional-toast .close-btn {
-  position: absolute;
-  top: 5px;
-  right: 8px;
-  cursor: pointer;
-  color: #fff;
-  font-weight: bold;
-  font-size: 14px;
-}
-
-/* ================= ANIMATION ================= */
-@keyframes slideIn {
-  from {
-    transform: translateX(120%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
+#toastContainer { max-height: 70vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #00ff66 #111; padding-right: 4px; }
+#toastContainer::-webkit-scrollbar { width:6px; }
+#toastContainer::-webkit-scrollbar-track { background:#111; }
+#toastContainer::-webkit-scrollbar-thumb { background:#00ff66; border-radius:10px; }
+.close-all-btn { position: sticky; top:0; z-index:3; background: linear-gradient(90deg,#ff4444,#ff0000); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:bold; cursor:pointer; margin-bottom:6px; }
+.close-all-btn:hover { opacity:0.85; }
+.professional-toast { background: linear-gradient(90deg,#1f1f1f,#333); color:#00ff66; padding:12px 20px; border-radius:10px; box-shadow:0 5px 20px rgba(0,0,0,0.4); font-family:'Segoe UI',sans-serif; font-weight:bold; min-width:250px; cursor:pointer; position:relative; display:flex; flex-direction:column; gap:5px; word-break:break-word; animation:slideIn 0.4s ease; }
+.professional-toast:hover { background:linear-gradient(90deg,#222,#444); }
+.professional-toast .toast-title { font-size:14px; font-weight:bold; }
+.professional-toast .toast-episode { font-size:13px; }
+.professional-toast .close-btn { position:absolute; top:5px; right:8px; cursor:pointer; color:#fff; font-weight:bold; font-size:14px; }
+@keyframes slideIn { from { transform:translateX(120%); opacity:0; } to { transform:translateX(0); opacity:1; } }
+/* Resume toast */
+.resume-toast { background:#111;color:#00ff66;padding:10px 14px;border-radius:8px;font-weight:bold;cursor:pointer;border:1px solid #00ff66; }
+.resume-toast:hover { background:#222; }
 `;
 document.head.appendChild(style);
 
-
-// Global Close All button (hidden initially)
+// Global Close All button
 const closeAllBtn = document.createElement("button");
 closeAllBtn.innerText = "× Close All";
 closeAllBtn.style = `
@@ -3093,25 +3021,32 @@ closeAllBtn.style = `
   font-weight: bold;
   cursor: pointer;
   margin-bottom: 5px;
-  display: none; /* hidden by default */
+  display: none;
 `;
 closeAllBtn.addEventListener("click", () => {
-  const allToasts = toastContainer.querySelectorAll(".professional-toast");
+  const allToasts = toastContainer.querySelectorAll(".professional-toast, .resume-toast");
   allToasts.forEach(t => t.remove());
-  closeAllBtn.style.display = "none"; // hide button after closing all
+  closeAllBtn.style.display = "none";
 });
 toastContainer.appendChild(closeAllBtn);
 
-/* Show toast notification for new episode */
+/* Show episode notification - only once ever */
 function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
-  const now = Date.now();
-  const lastNotified = parseInt(localStorage.getItem(episodeId) || 0);
+  // Retrieve persistent notified episodes list from localStorage
+  let notifiedEpisodes = JSON.parse(localStorage.getItem("notifiedEpisodes") || "{}");
 
-  if (now - lastNotified < 24 * 60 * 60 * 1000) return;
+  // If already notified, do nothing
+  if (notifiedEpisodes[episodeId]) return;
 
-  localStorage.setItem(episodeId, now);
-  setTimeout(() => localStorage.removeItem(episodeId), 24 * 60 * 60 * 1000);
+  // Mark this episode as notified
+  notifiedEpisodes[episodeId] = true;
+  localStorage.setItem("notifiedEpisodes", JSON.stringify(notifiedEpisodes));
 
+  // Remove any existing professional-toast (only show latest)
+  const oldToasts = toastContainer.querySelectorAll(".professional-toast");
+  oldToasts.forEach(t => t.remove());
+
+  // Create new toast
   const toast = document.createElement("div");
   toast.className = "professional-toast";
   toast.innerHTML = `
@@ -3120,19 +3055,14 @@ function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
     <span class="close-btn">&times;</span>
   `;
   toastContainer.appendChild(toast);
-
-  // Show the Close All button whenever a toast appears
   closeAllBtn.style.display = "block";
 
   toast.querySelector(".close-btn").addEventListener("click", () => {
     toast.remove();
-    // Hide Close All if no more toasts remain
-    if (toastContainer.querySelectorAll(".professional-toast").length === 0) {
+    if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length)
       closeAllBtn.style.display = "none";
-    }
   });
 
-  // Animate in
   toast.style.opacity = "0";
   toast.style.transform = "translateX(100%)";
   setTimeout(() => {
@@ -3141,25 +3071,47 @@ function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
     toast.style.transform = "translateX(0)";
   }, 50);
 
+  // Auto-remove after 60 seconds
   setTimeout(() => {
     toast.remove();
-    if (toastContainer.querySelectorAll(".professional-toast").length === 0) {
+    if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length)
       closeAllBtn.style.display = "none";
-    }
   }, 60000);
 }
-/* ---------------- Watch for new episodes notifications ---------------- */
+
+/* Show Resume Notification */
+function showResumeToast(ep, index) {
+  const toast = document.createElement("div");
+  toast.className = "resume-toast";
+  const time = playbackPositions[ep.id] ? formatTime(playbackPositions[ep.id]) : "0:00";
+  toast.innerHTML = `You left off Episode ${ep.epNumber || ep.ep || index+1} at ${time}. Click to resume`;
+  toastContainer.appendChild(toast);
+
+  toast.addEventListener("click", () => {
+    playEpisode(index);
+    toast.remove();
+  });
+
+  setTimeout(() => { toast.remove(); }, 15000);
+}
+
+// format seconds to mm:ss
+function formatTime(sec) {
+  const m = Math.floor(sec/60);
+  const s = Math.floor(sec%60);
+  return `${m}:${s.toString().padStart(2,'0')}`;
+}
+
+/* ---------------- Watch for new episodes ---------------- */
 function watchEpisodesNotifications(movieId, seriesTitle) {
   const episodesColl = collection(db, "movies", movieId, "episodes");
   const q = query(episodesColl);
-  let knownEpisodes = new Set(); // only track new episodes added after page load
-
+  let knownEpisodes = new Set();
   return onSnapshot(q, snapshot => {
     snapshot.docChanges().forEach(change => {
       if (change.type === "added") {
         const episode = { id: change.doc.id, ...change.doc.data() };
         const epNumber = episode.epNumber || episode.ep || "";
-
         if (!knownEpisodes.has(episode.id)) {
           knownEpisodes.add(episode.id);
           showEpisodeNotification(seriesTitle, episode.id, epNumber);
@@ -3169,128 +3121,118 @@ function watchEpisodesNotifications(movieId, seriesTitle) {
   });
 }
 
-/* ---------------- Existing fetchEpisodesForMovie ---------------- */
+/* Fetch episodes */
 async function fetchEpisodesForMovie(movieId) {
   const episodesColl = collection(db, "movies", movieId, "episodes");
   const snapshot = await getDocs(episodesColl);
   return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-/* ---------------- Existing watchEpisodes ---------------- */
+/* ---------------- WATCH EPISODES & BUTTONS ---------------- */
 function watchEpisodes(movieId) {
-  const episodesColl = collection(db, "movies", movieId, "episodes");
+  const episodesColl = collection(db,"movies",movieId,"episodes");
   const q = query(episodesColl);
   return onSnapshot(q, snapshot => {
-    let episodes = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    let episodes = snapshot.docs.map(d => ({ id:d.id,...d.data() }));
+    episodes.sort((a,b)=>{ const sA=a.season||1,sB=b.season||1,eA=a.epNumber||a.ep||1,eB=b.epNumber||b.ep||1; return sA!==sB?sA-sB:eA-eB; });
 
-    // Sort episodes by season then episode number
-    episodes.sort((a, b) => {
-      const seasonA = a.season || 1;
-      const seasonB = b.season || 1;
-      const epA = a.epNumber || a.ep || 1;
-      const epB = b.epNumber || b.ep || 1;
-      if (seasonA !== seasonB) return seasonA - seasonB;
-      return epA - epB;
-    });
+    currentEpisodeList = episodes;
+    const episodeListContainer = document.getElementById("episodeList");
+    episodeListContainer.innerHTML = `<h4>Episodes</h4><div class="episode-seasons"></div>`;
+    const seasonsContainer = episodeListContainer.querySelector(".episode-seasons");
 
-    const episodeList = document.getElementById("episodeList");
-    episodeList.innerHTML = `<h4>Episodes</h4><div class="episode-seasons"></div>`;
-    const seasonsContainer = episodeList.querySelector(".episode-seasons");
+    /* Fixed buttons on top */
+    const fixedNav = document.createElement("div");
+    fixedNav.style=`display:flex; justify-content:center; gap:10px; padding:10px 0; background:#111; color:#00ff66; border-radius:6px; margin-bottom:10px; position:sticky; top:0; z-index:9999;`;
+    const prevBtn=document.createElement("button"); prevBtn.innerText="⏮ Previous"; prevBtn.style="padding:8px 14px;background:#00ff66;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;";
+    const resumeBtn=document.createElement("button"); resumeBtn.innerText="▶ Resume"; resumeBtn.style="padding:8px 14px;background:#00ff66;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;";
+    const nextBtn=document.createElement("button"); nextBtn.innerText="⏭ Next"; nextBtn.style="padding:8px 14px;background:#00ff66;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;";
+    fixedNav.appendChild(prevBtn); fixedNav.appendChild(resumeBtn); fixedNav.appendChild(nextBtn);
+    episodeListContainer.prepend(fixedNav);
 
-    // Group episodes by season
-    const seasonsMap = {};
-    episodes.forEach(ep => {
-      const seasonNum = ep.season || 1;
-      if (!seasonsMap[seasonNum]) seasonsMap[seasonNum] = [];
-      seasonsMap[seasonNum].push(ep);
-    });
+    function updateButtons(index) {
+      currentEpisodeIndex=index;
+      prevBtn.disabled=index===0;
+      nextBtn.disabled=index===currentEpisodeList.length-1;
+      prevBtn.onclick=()=>playEpisode(index-1);
+      nextBtn.onclick=()=>playEpisode(index+1);
+      resumeBtn.onclick=()=>{
+        const ep=currentEpisodeList[index];
+        const video=document.querySelector(".episode-video-wrapper video");
+        if(video){ video.currentTime=playbackPositions[ep.id]||0; video.play(); }
+      };
+    }
 
-    for (const [season, eps] of Object.entries(seasonsMap)) {
-      const seasonDiv = document.createElement("div");
-      seasonDiv.className = "season-group";
-      seasonDiv.innerHTML = `<h5 style="cursor:pointer;background:#222;color:#00ff66;padding:6px 10px;border-radius:6px;margin-top:10px;">
-                                Season ${season} ▼
-                             </h5>`;
-      
-      const epsGrid = document.createElement("div");
-      epsGrid.className = "episodes-grid";
-      epsGrid.style = `
-        display: grid;
-        grid-template-columns: repeat(auto-fill,minmax(150px,1fr));
-        gap: 10px;
-        margin-top: 6px;
-      `;
+    function playEpisode(index){
+      const ep=currentEpisodeList[index]; if(!ep) return;
+      const player=document.getElementById("modalPlayer");
+      const epUrl=ep.fileUrl||ep.url;
+      const playable=isDownloadable(epUrl);
+      const existing=player.querySelector(".episode-video-wrapper"); if(existing) existing.remove();
 
-      eps.forEach(ep => {
-        const epUrl = ep.fileUrl || ep.url;
-        const playable = isDownloadable(epUrl);
+      const wrapper=document.createElement("div");
+      wrapper.className="episode-video-wrapper";
+      wrapper.style="margin-top:10px;position:relative;width:100%;max-height:400px;background:#000;";
 
-        const epDiv = document.createElement("div");
-        epDiv.style = `
-          border:1px solid #333;padding:8px;border-radius:6px;
-          background:#111;color:#00ff66;
-          cursor:pointer;display:flex;flex-direction:column;gap:4px;
-        `;
-        epDiv.innerHTML = `<strong>${ep.title || "Episode " + (ep.epNumber || ep.ep || "")}</strong>
-                           ${ep.description ? `<small>${ep.description}</small>` : ""}
-                           <button style="padding:4px 6px;background:#00ff66;color:#000;border:none;border-radius:4px;font-size:12px;">
-                             ▶ Play
-                           </button>`;
-        
-        epDiv.querySelector("button").addEventListener("click", (e) => {
-          e.stopPropagation();
-          const player = document.getElementById("modalPlayer");
-          const existing = player.querySelector(".episode-video-wrapper");
-          if (existing) existing.remove();
+      if(playable){
+        wrapper.innerHTML=`<video controls autoplay src="${epUrl}" style="width:100%;max-height:400px;"></video>
+                           <a href="${epUrl}" download style="display:inline-block;margin-top:8px;background:#00ff66;padding:6px 10px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">⬇ Download</a>`;
+        const videoElem=wrapper.querySelector("video");
+        if(playbackPositions[ep.id]) videoElem.currentTime=playbackPositions[ep.id];
+        videoElem.addEventListener("timeupdate",()=>{ playbackPositions[ep.id]=videoElem.currentTime; localStorage.setItem("playbackPositions", JSON.stringify(playbackPositions)); });
+      } else {
+        wrapper.innerHTML=`<iframe src="${epUrl}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
+      }
 
-          const wrapper = document.createElement("div");
-          wrapper.className = "episode-video-wrapper";
-          wrapper.style = "margin-top:10px;position:relative;width:100%;max-height:400px;background:#000;";
+      player.appendChild(wrapper);
+      updateButtons(index);
+    }
 
-          if (playable) {
-            wrapper.innerHTML = `<video controls autoplay src="${epUrl}" style="width:100%;max-height:400px;"></video>
-                                 <a href="${epUrl}" download style="display:inline-block;margin-top:8px;background:#00ff66;padding:6px 10px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">⬇ Download</a>`;
-          } else {
-            wrapper.innerHTML = `<iframe src="${epUrl}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
-          }
-          player.appendChild(wrapper);
-        });
+    /* ---- Group episodes by season ---- */
+    const seasonsMap={};
+    episodes.forEach((ep)=>{ const sn=ep.season||1; if(!seasonsMap[sn]) seasonsMap[sn]=[]; seasonsMap[sn].push(ep); });
 
+    Object.entries(seasonsMap).forEach(([season, eps])=>{
+      const seasonDiv=document.createElement("div"); seasonDiv.className="season-group";
+      seasonDiv.innerHTML=`<h5 style="cursor:pointer;background:#222;color:#00ff66;padding:6px 10px;border-radius:6px;margin-top:10px;">Season ${season} ▼</h5>`;
+      const epsGrid=document.createElement("div"); epsGrid.className="episodes-grid";
+      epsGrid.style=`display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:6px;`;
+      eps.forEach((ep, idx)=>{
+        const epDiv=document.createElement("div");
+        epDiv.style=`border:1px solid #333;padding:8px;border-radius:6px;background:#111;color:#00ff66;cursor:pointer;display:flex;flex-direction:column;gap:4px;`;
+        epDiv.innerHTML=`<strong>${ep.title||"Episode "+(ep.epNumber||ep.ep||"")}</strong>
+                         ${ep.description?`<small>${ep.description}</small>`:""}
+                         <button style="padding:4px 6px;background:#00ff66;color:#000;border:none;border-radius:4px;font-size:12px;">▶ Play</button>`;
+        epDiv.querySelector("button").addEventListener("click",(e)=>{ e.stopPropagation(); playEpisode(idx); });
         epsGrid.appendChild(epDiv);
       });
-
       seasonDiv.appendChild(epsGrid);
       seasonsContainer.appendChild(seasonDiv);
+      seasonDiv.querySelector("h5").addEventListener("click",()=>{ epsGrid.style.display=epsGrid.style.display==="none"?"grid":"none"; });
+    });
 
-      // Toggle episodes visibility on season header click
-      const header = seasonDiv.querySelector("h5");
-      header.addEventListener("click", () => {
-        epsGrid.style.display = epsGrid.style.display === "none" ? "grid" : "none";
-      });
-    }
+    // Show resume notification if playback exists
+    const lastIndex=currentEpisodeList.findIndex(ep=>playbackPositions[ep.id]);
+    if(lastIndex!==-1) showResumeToast(currentEpisodeList[lastIndex], lastIndex);
   });
 }
 
 /* ---------------- Watch all series for notifications ---------------- */
 async function watchAllEpisodeNotifications() {
-  const moviesColl = collection(db, "movies");
+  const moviesColl = collection(db,"movies");
   const moviesSnapshot = await getDocs(moviesColl);
-
-  moviesSnapshot.forEach(movieDoc => {
-    const movieId = movieDoc.id;
-    const movieTitle = movieDoc.data().title || "Untitled Series";
-
-    if (!episodeUnsubscriptions[movieId]) {
-      const unsub = watchEpisodesNotifications(movieId, movieTitle);
-      episodeUnsubscriptions[movieId] = unsub;
+  moviesSnapshot.forEach(movieDoc=>{
+    const movieId=movieDoc.id;
+    const movieTitle=movieDoc.data().title||"Untitled Series";
+    if(!episodeUnsubscriptions[movieId]){
+      const unsub=watchEpisodesNotifications(movieId,movieTitle);
+      episodeUnsubscriptions[movieId]=unsub;
     }
   });
 }
 
 /* ---------------- Start watching on DOM load ---------------- */
-document.addEventListener("DOMContentLoaded", () => {
-  watchAllEpisodeNotifications(); // <-- notifications added
-});
+document.addEventListener("DOMContentLoaded",()=>{ watchAllEpisodeNotifications(); });
 
 
 /* ---------------- MODAL SCROLL LOCK ---------------- */
@@ -4302,6 +4244,7 @@ animateCF();
 
 </body>
 </html>
+
 
 
 
