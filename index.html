@@ -1468,6 +1468,124 @@ a.download-link:hover,
   from { opacity: 0.7; }
   to { opacity: 1; }
 }
+/* ================= TYPE + STATUS (TOP RIGHT) ================= */
+.top-right-info {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  text-align: right;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none; /* avoids accidental clicks */
+}
+
+.type-badge {
+  background: rgba(0, 0, 0, 0.6);
+  color: #00ff66;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(4px);
+  transition: all 0.3s ease;
+}
+
+.status-badge.ongoing {
+  background: rgba(255, 165, 0, 0.15);
+  color: #ffa500;
+}
+
+.status-badge.complete {
+  background: rgba(0, 255, 102, 0.15);
+  color: #00ff66;
+}
+
+/* ================= CONTINUE WATCHING RIBBON ================= */
+.continue-ribbon {
+  position: absolute;
+  top: 14px;
+  left: -40px;
+  transform: rotate(-45deg);
+  background: linear-gradient(45deg, #ff6600, #ff9900);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 42px;
+  z-index: 4;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  text-align: center;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.poster-wrapper:hover .continue-ribbon {
+  transform: rotate(-45deg) translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+}
+
+/* ================= EPISODE PROGRESS BAR ================= */
+.episode-progress {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 8px 0 10px;
+}
+
+.episode-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #00ff66, #00cc55);
+  width: 0;
+  transition: width 0.6s ease, background 0.4s ease;
+  border-radius: 6px;
+}
+
+/* ================= BADGE STACKING FIX ================= */
+.poster-wrapper {
+  overflow: hidden;
+  border-radius: 10px;
+  position: relative;
+}
+
+/* ================= MOBILE TWEAKS ================= */
+@media (max-width: 600px) {
+  .continue-ribbon {
+    font-size: 11px;
+    padding: 5px 36px;
+  }
+
+  .type-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .status-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  .episode-progress {
+    height: 5px;
+  }
+}
 
 </style>
  <!-- New Year Overlay -->
@@ -1479,6 +1597,10 @@ a.download-link:hover,
 
 
 </head>
+  <section id="continueWatchingSection" style="display:none;">
+  <h2>Continue Watching</h2>
+  <div id="continueWatching" class="continue-grid"></div>
+</section>
   <div id="notificationModal" class="notification-modal">
   <div class="notification-content">
     
@@ -2248,15 +2370,14 @@ function renderMovies() {
   filtered.forEach((m, index) => {
 
     let badgesHTML = "";
+    let topRightHTML = "";
+    let progressHTML = "";
+    let continueHTML = "";
 
     /* -------- NEW MOVIE -------- */
     if (m.type !== "Series" && now - (m.createdAt || 0) < 86400000) {
       badgesHTML += `<div class="movie-glow-badge fade-out-24h">NEW MOVIE</div>`;
-
-      newMovies.push({
-        title: m.title,
-        poster: m.poster
-      });
+      newMovies.push({ title: m.title, poster: m.poster });
     }
 
     /* -------- HOT -------- */
@@ -2264,26 +2385,53 @@ function renderMovies() {
       badgesHTML += `<div class="hot-badge">HOT</div>`;
     }
 
+    /* -------- TYPE LABEL (RIGHT SIDE) -------- */
+    const typeLabel =
+      m.type === "Series" ? "SERIES" :
+      m.type === "Animation" ? "ANIMATION" :
+      "MOVIE";
+
+    topRightHTML += `<div class="type-badge">${typeLabel}</div>`;
+
+    /* -------- STATUS (ONGOING / COMPLETE) -------- */
+    if (m.type === "Series") {
+      const isComplete = m.completed === true;
+      topRightHTML += `
+        <div class="status-badge ${isComplete ? "complete" : "ongoing"}">
+          ${isComplete ? "COMPLETE" : "ONGOING"}
+        </div>
+      `;
+    }
+
     /* -------- SERIES EPISODES -------- */
     if (m.type === "Series" && m.episodes?.length) {
-      const latest  = m.episodes[m.episodes.length - 1];
+      const latest = m.episodes[m.episodes.length - 1];
       const isFresh = now - (latest.createdAt || now) < 86400000;
-      const ep      = latest.ep || 0;
-      const season  = latest.season || 1;
+      const ep = latest.ep || 0;
 
       if (isFresh && !hasWatched(m.id, ep)) {
         badgesHTML += `
           <div class="new-badge fade-out-24h">
-            NEW Episode S${season}E${ep}
+            NEW EPISODE
           </div>
         `;
+        newEpisodes.push({ title: m.title, poster: m.poster });
+      }
 
-        newEpisodes.push({
-          title: m.title,
-          season,
-          ep,
-          poster: m.poster
-        });
+      /* -------- EPISODE PROGRESS BAR -------- */
+      const watchedCount = getWatchedEpisodes(m.id) || 0;
+      const totalEpisodes = m.episodes.length;
+      const progress = Math.min((watchedCount / totalEpisodes) * 100, 100);
+
+      progressHTML = `
+        <div class="episode-progress">
+          <div class="episode-progress-bar" style="width:${progress}%"></div>
+        </div>
+      `;
+
+      /* -------- CONTINUE WATCHING -------- */
+      if (watchedCount > 0 && watchedCount < totalEpisodes) {
+        continueHTML = `<div class="continue-ribbon">🔥 Continue Watching</div>`;
       }
     }
 
@@ -2292,62 +2440,68 @@ function renderMovies() {
       : "";
 
     const card = document.createElement("div");
-card.className = "card";
+    card.className = "card";
 
-card.innerHTML = `
-  <div class="poster-wrapper" style="position:relative;">
-    <div class="badges-container">${badgesHTML}</div>
-    <img class="poster" src="${m.poster || ""}">
+    card.innerHTML = `
+      <div class="poster-wrapper" style="position:relative;">
+        ${continueHTML}
+        <div class="badges-container">${badgesHTML}</div>
 
-    <!-- Compare circle for selecting second movie -->
-    <div class="compare-circle" 
-         onclick="selectSecondMovie(${index})" 
-         title="Select for comparison" 
-         style="display:none; position:absolute; top:10px; right:10px; width:24px; height:24px; border-radius:50%; border:2px solid #00ff66; background:rgba(0,255,102,0.2); cursor:pointer;">
-    </div>
-  </div>
+        <div class="top-right-info">
+          ${topRightHTML}
+        </div>
 
-  <div class="card-body">
-    <h3 class="movie-title">${(m.title || '').replace(/</g,'&lt;')}</h3>
-    <div class="meta">${m.year || ''} · ${(m.genres || []).join(", ")}</div>
-    <div class="rating">${ratingText}</div>
+        <img class="poster" src="${m.poster || ""}">
 
-    <div class="card-actions">
+        <div class="compare-circle"
+             onclick="selectSecondMovie(${index})"
+             title="Select for comparison"
+             style="display:none; position:absolute; top:10px; right:10px; width:24px; height:24px; border-radius:50%; border:2px solid #00ff66; background:rgba(0,255,102,0.2); cursor:pointer;">
+        </div>
+      </div>
 
-      <button class="btn-icon" title="Details" onclick="protectedAction('details', ${index})">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10
-                   10-4.48 10-10S17.52 2 12 2zm0 3c.83 0 1.5.67
-                   1.5 1.5S12.83 8 12 8s-1.5-.67-1.5-1.5S11.17 5 12 5zm2 12h-4v-2h1v-4h-1v-2h3v6h1v2z"/>
-        </svg>
-      </button>
+      <div class="card-body">
+        <h3 class="movie-title">${(m.title || '').replace(/</g,'&lt;')}</h3>
+        <div class="meta">${m.year || ''} · ${(m.genres || []).join(", ")}</div>
+        <div class="rating">${ratingText}</div>
 
-      <button class="btn-icon" title="Add to Watchlist"
-        onclick="event.stopPropagation(); protectedAction('add', ${index})">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
-          <path d="M19 3H5c-1.1 0-2 .9-2 2v14l8-3 8 3V5
-                   c0-1.1-.9-2-2-2zM12 10v4h-2v-4H8v-2h2V6h2v2h2v2h-2z"/>
-        </svg>
-      </button>
+        ${progressHTML}
 
-      <button class="btn-icon" title="Watch Movie" onclick="protectedAction('watch', ${index})">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
-          <path d="M10 8.64L15.27 12 10 15.36V8.64M12 2C6.5 2 
-                   2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/>
-        </svg>
-      </button>
+        <div class="card-actions">
 
-      <button class="btn-icon" title="Compare"
-        onclick="event.stopPropagation(); openCompare(${index})">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
-          <path d="M10 3H5v18h5V3zm9 6h-5v12h5V9z"/>
-        </svg>
-      </button>
+          <button class="btn-icon" title="Details" onclick="protectedAction('details', ${index})">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10
+                       10-4.48 10-10S17.52 2 12 2zm0 3c.83 0 1.5.67
+                       1.5 1.5S12.83 8 12 8s-1.5-.67-1.5-1.5S11.17 5 12 5zm2 12h-4v-2h1v-4h-1v-2h3v6h1v2z"/>
+            </svg>
+          </button>
 
-    </div>
-  </div>
-`;
+          <button class="btn-icon" title="Add to Watchlist"
+            onclick="event.stopPropagation(); protectedAction('add', ${index})">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14l8-3 8 3V5
+                       c0-1.1-.9-2-2-2zM12 10v4h-2v-4H8v-2h2V6h2v2h2v2h-2z"/>
+            </svg>
+          </button>
 
+          <button class="btn-icon" title="Watch Movie" onclick="protectedAction('watch', ${index})">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
+              <path d="M10 8.64L15.27 12 10 15.36V8.64M12 2C6.5 2 
+                       2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/>
+            </svg>
+          </button>
+
+          <button class="btn-icon" title="Compare"
+            onclick="event.stopPropagation(); openCompare(${index})">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
+              <path d="M10 3H5v18h5V3zm9 6h-5v12h5V9z"/>
+            </svg>
+          </button>
+
+        </div>
+      </div>
+    `;
 
     card.querySelector(".poster").onclick = () =>
       protectedAction("watch", index);
@@ -2356,6 +2510,7 @@ card.innerHTML = `
   });
 
   window.currentFiltered = filtered;
+
 
   /* ===== SHOW GROUPED NOTIFICATION WITH POSTERS ===== */
   if (newMovies.length || newEpisodes.length) {
@@ -4133,6 +4288,7 @@ animateCF();
 
 </body>
 </html>
+
 
 
 
