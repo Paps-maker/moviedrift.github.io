@@ -2456,7 +2456,21 @@ function renderMovies() {
         <div class="compare-circle"
              onclick="selectSecondMovie(${index})"
              title="Select for comparison"
-             style="display:none; position:absolute; top:10px; right:10px; width:24px; height:24px; border-radius:50%; border:2px solid #00ff66; background:rgba(0,255,102,0.2); cursor:pointer;">
+              style="
+  display: none;
+  position: absolute;
+  top:12%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #00ff66;
+  background: rgba(0, 255, 102, 0.2);
+  cursor: pointer;
+  z-index: 5;
+  transition: all 0.3s ease;
+"
         </div>
       </div>
 
@@ -4288,6 +4302,7 @@ animateCF();
 
 </body>
 </html>
+
 
 
 
