@@ -3294,31 +3294,92 @@ window.viewDetailsByFiltered = async function (index) {
 };
 
 /* ---------------- WATCH BUTTON (with real-time episodes) ---------------- */
-window.viewAndPlayByFiltered = function(index){
+/* ---------------- WATCH BUTTON (with real-time episodes + resume) ---------------- */
+window.viewAndPlayByFiltered = function(index) {
   const m = window.currentFiltered[index];
-  if (currentUser && currentUser.status !== "Paid") { alert("⚠ Your account is unpaid. Upgrade to Paid."); return; }
+  if (currentUser && currentUser.status !== "Paid") { 
+    alert("⚠ Your account is unpaid. Upgrade to Paid."); 
+    return; 
+  }
 
   const player = document.getElementById("modalPlayer");
   const episodeList = document.getElementById("episodeList");
-  player.innerHTML = ""; episodeList.innerHTML = "";
+  player.innerHTML = ""; 
+  episodeList.innerHTML = "";
 
+  const movieId = m.id;
+
+  // ---- Get last playback position ----
+  let playbackPositions = JSON.parse(localStorage.getItem("moviePlaybackPositions") || "{}");
+  let lastTime = playbackPositions[movieId] || 0;
+
+  // ---- Trailer ----
   if (m.trailer) {
     player.innerHTML += `<h4>Trailer</h4>
       <iframe src="${convertYouTubeLink(m.trailer)}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
   }
 
+  // ---- Movie ----
   if (m.fileUrl) {
     const direct = isDownloadable(m.fileUrl);
+
+    let movieWrapper = document.createElement("div");
+    movieWrapper.style = "position:relative;width:100%;max-height:500px;background:#000;margin-top:10px;";
+    
     if (direct) {
-      player.innerHTML += `<h4>Movie</h4>
+      movieWrapper.innerHTML = `
         <video controls autoplay src="${m.fileUrl}" style="width:100%;max-height:500px;"></video>
         <a href="${m.fileUrl}" download style="display:inline-block;margin-top:10px;background:#00ff66;
-           padding:10px 15px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">⬇ Download</a>`;
+           padding:10px 15px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">⬇ Download</a>
+      `;
+      const videoElem = movieWrapper.querySelector("video");
+
+      // Resume logic
+      if (lastTime > 0) {
+        const resumeToast = document.createElement("div");
+        resumeToast.className = "professional-toast resume-toast";
+        resumeToast.innerHTML = `
+          <span class="toast-title">You left off from ${Math.floor(lastTime/60)}:${Math.floor(lastTime%60).toString().padStart(2,'0')}</span>
+          <div style="display:flex;gap:8px;margin-top:4px;">
+            <button id="resumeMovieBtn" style="padding:4px 8px;background:#00ff66;color:#000;border:none;border-radius:4px;font-size:12px;font-weight:bold;">▶ Resume</button>
+            <button id="restartMovieBtn" style="padding:4px 8px;background:#ff4444;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:bold;">⟲ Restart</button>
+          </div>
+        `;
+        toastContainer.appendChild(resumeToast);
+        closeAllBtn.style.display = "block";
+
+        // Resume button
+        resumeToast.querySelector("#resumeMovieBtn").onclick = () => {
+          videoElem.currentTime = lastTime;
+          videoElem.play();
+          resumeToast.remove();
+          if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length)
+            closeAllBtn.style.display = "none";
+        };
+
+        // Restart button
+        resumeToast.querySelector("#restartMovieBtn").onclick = () => {
+          videoElem.currentTime = 0;
+          videoElem.play();
+          resumeToast.remove();
+          if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length)
+            closeAllBtn.style.display = "none";
+        };
+      }
+
+      // Update playback positions
+      videoElem.addEventListener("timeupdate", () => {
+        playbackPositions[movieId] = videoElem.currentTime;
+        localStorage.setItem("moviePlaybackPositions", JSON.stringify(playbackPositions));
+      });
+
     } else {
-      player.innerHTML += `<h4>Movie</h4>
-        <iframe src="${m.fileUrl}" frameborder="0" allowfullscreen style="width:100%;height:500px;"></iframe>`;
+      movieWrapper.innerHTML = `<iframe src="${m.fileUrl}" frameborder="0" allowfullscreen style="width:100%;height:500px;"></iframe>`;
     }
+
+    player.appendChild(movieWrapper);
   }
+
 
   if (m.type === "Series") {
     if (episodeUnsub) episodeUnsub();
@@ -4244,6 +4305,7 @@ animateCF();
 
 </body>
 </html>
+
 
 
 
