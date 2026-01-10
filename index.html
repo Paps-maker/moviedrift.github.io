@@ -3030,10 +3030,10 @@ closeAllBtn.addEventListener("click", () => {
 });
 toastContainer.appendChild(closeAllBtn);
 
-/* Show episode notification - only once ever */
+/* ---------------- Episode Notification (only once ever) ---------------- */
 function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
   // Retrieve persistent notified episodes list from localStorage
-  let notifiedEpisodes = JSON.parse(localStorage.getItem("notifiedEpisodes") || "{}");
+  const notifiedEpisodes = JSON.parse(localStorage.getItem("notifiedEpisodes") || "{}");
 
   // If already notified, do nothing
   if (notifiedEpisodes[episodeId]) return;
@@ -3042,11 +3042,11 @@ function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
   notifiedEpisodes[episodeId] = true;
   localStorage.setItem("notifiedEpisodes", JSON.stringify(notifiedEpisodes));
 
-  // Remove any existing professional-toast (only show latest)
+  // Remove any existing episode toasts (show only latest)
   const oldToasts = toastContainer.querySelectorAll(".professional-toast");
   oldToasts.forEach(t => t.remove());
 
-  // Create new toast
+  // Create toast
   const toast = document.createElement("div");
   toast.className = "professional-toast";
   toast.innerHTML = `
@@ -3054,28 +3054,48 @@ function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
     <span class="toast-episode">Episode ${episodeNumber} Added</span>
     <span class="close-btn">&times;</span>
   `;
-  toastContainer.appendChild(toast);
-  closeAllBtn.style.display = "block";
 
+  toastContainer.appendChild(toast);
+
+  // Show close-all button if it exists
+  if (typeof closeAllBtn !== "undefined") {
+    closeAllBtn.style.display = "block";
+  }
+
+  // Close button logic
   toast.querySelector(".close-btn").addEventListener("click", () => {
     toast.remove();
-    if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length)
+
+    if (
+      !toastContainer.querySelectorAll(".professional-toast, .resume-toast").length &&
+      typeof closeAllBtn !== "undefined"
+    ) {
       closeAllBtn.style.display = "none";
+    }
   });
 
+  // Netflix-style slide-in animation
   toast.style.opacity = "0";
   toast.style.transform = "translateX(100%)";
-  setTimeout(() => {
+
+  requestAnimationFrame(() => {
     toast.style.transition = "all 0.5s ease";
     toast.style.opacity = "1";
     toast.style.transform = "translateX(0)";
-  }, 50);
+  });
 
   // Auto-remove after 60 seconds
   setTimeout(() => {
+    if (!toast.isConnected) return;
+
     toast.remove();
-    if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length)
+
+    if (
+      !toastContainer.querySelectorAll(".professional-toast, .resume-toast").length &&
+      typeof closeAllBtn !== "undefined"
+    ) {
       closeAllBtn.style.display = "none";
+    }
   }, 60000);
 }
 
@@ -4305,6 +4325,7 @@ animateCF();
 
 </body>
 </html>
+
 
 
 
