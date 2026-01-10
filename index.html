@@ -2300,7 +2300,7 @@ function populateFilters() {
 
 let notifTimer = null;
 
-function showNotification(htmlContent, duration = 60000) {
+function showNotification(htmlContent, duration = 10000) {
   const modal = document.getElementById("notificationModal");
   const text  = document.getElementById("notificationText");
 
@@ -3057,10 +3057,10 @@ function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
     toast.remove();
   });
 
-  // Auto-remove after 60 seconds
+  // Auto-remove after 15 seconds
   setTimeout(() => {
     if (toast.isConnected) toast.remove();
-  }, 60000);
+  }, 15000);
 }
 
 /* Show Resume Notification */
@@ -4289,6 +4289,7 @@ animateCF();
 
 </body>
 </html>
+
 
 
 
