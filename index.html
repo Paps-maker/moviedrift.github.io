@@ -3030,21 +3030,16 @@ closeAllBtn.addEventListener("click", () => {
 });
 toastContainer.appendChild(closeAllBtn);
 
-/* ---------------- Episode Notification (only once ever) ---------------- */
+/* ---------------- Episode Notification (once per episode, multiple allowed) ---------------- */
 function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
-  // Retrieve persistent notified episodes list from localStorage
-  const notifiedEpisodes = JSON.parse(localStorage.getItem("notifiedEpisodes") || "{}");
+  const notified = JSON.parse(localStorage.getItem("notifiedEpisodes") || "{}");
 
-  // If already notified, do nothing
-  if (notifiedEpisodes[episodeId]) return;
+  // Prevent duplicate notifications per episode
+  if (notified[episodeId]) return;
 
-  // Mark this episode as notified
-  notifiedEpisodes[episodeId] = true;
-  localStorage.setItem("notifiedEpisodes", JSON.stringify(notifiedEpisodes));
-
-  // Remove any existing episode toasts (show only latest)
-  const oldToasts = toastContainer.querySelectorAll(".professional-toast");
-  oldToasts.forEach(t => t.remove());
+  // Mark as notified
+  notified[episodeId] = true;
+  localStorage.setItem("notifiedEpisodes", JSON.stringify(notified));
 
   // Create toast
   const toast = document.createElement("div");
@@ -3057,45 +3052,14 @@ function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
 
   toastContainer.appendChild(toast);
 
-  // Show close-all button if it exists
-  if (typeof closeAllBtn !== "undefined") {
-    closeAllBtn.style.display = "block";
-  }
-
-  // Close button logic
+  // Close button handler
   toast.querySelector(".close-btn").addEventListener("click", () => {
     toast.remove();
-
-    if (
-      !toastContainer.querySelectorAll(".professional-toast, .resume-toast").length &&
-      typeof closeAllBtn !== "undefined"
-    ) {
-      closeAllBtn.style.display = "none";
-    }
-  });
-
-  // Netflix-style slide-in animation
-  toast.style.opacity = "0";
-  toast.style.transform = "translateX(100%)";
-
-  requestAnimationFrame(() => {
-    toast.style.transition = "all 0.5s ease";
-    toast.style.opacity = "1";
-    toast.style.transform = "translateX(0)";
   });
 
   // Auto-remove after 60 seconds
   setTimeout(() => {
-    if (!toast.isConnected) return;
-
-    toast.remove();
-
-    if (
-      !toastContainer.querySelectorAll(".professional-toast, .resume-toast").length &&
-      typeof closeAllBtn !== "undefined"
-    ) {
-      closeAllBtn.style.display = "none";
-    }
+    if (toast.isConnected) toast.remove();
   }, 60000);
 }
 
@@ -4325,6 +4289,7 @@ animateCF();
 
 </body>
 </html>
+
 
 
 
