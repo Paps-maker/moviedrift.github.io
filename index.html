@@ -3378,6 +3378,197 @@ window.viewAndPlayByFiltered = function(index) {
   document.getElementById("movieModal").style.display = "flex";
   document.getElementById("modalAddToList").onclick = () => addToWatchlistByFiltered(index);
 };
+/* =========================================================
+   GUEST / UNPAID SUBSCRIPTION POPUP (MovieDrift)
+   - Shows on page load
+   - Shows for Guest & Unpaid users
+   - Does NOT show for Paid users
+   - Can appear multiple times if user not logged in
+   - WhatsApp CTA
+========================================================= */
+
+/* ---------- Inject Popup CSS ---------- */
+const guestPopupStyle = document.createElement("style");
+guestPopupStyle.innerHTML = `
+.guest-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(6px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.4s ease;
+}
+
+.guest-popup {
+  background: linear-gradient(145deg, #111, #1b1b1b);
+  color: #fff;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 420px;
+  padding: 28px;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+  text-align: center;
+  animation: slideUp 0.5s ease;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.guest-popup h2 {
+  margin: 0 0 10px;
+  color: #00ff66;
+  font-size: 24px;
+}
+
+.guest-popup p {
+  font-size: 14px;
+  opacity: 0.9;
+  margin: 6px 0;
+}
+
+.guest-popup .price {
+  margin: 14px 0;
+  font-size: 16px;
+  font-weight: bold;
+  color: #00ff66;
+}
+
+.guest-benefits {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+  text-align: left;
+}
+
+.guest-benefits li {
+  font-size: 13px;
+  padding: 4px 0;
+  color: #ddd;
+}
+
+.guest-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.guest-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  text-align: center;
+}
+
+.guest-btn.primary {
+  background: #00ff66;
+  color: #000;
+}
+
+.guest-btn.primary:hover {
+  opacity: 0.9;
+}
+
+.guest-btn.secondary {
+  background: #333;
+  color: #fff;
+}
+
+.guest-btn.secondary:hover {
+  background: #444;
+}
+
+.guest-popup-overlay.hide {
+  animation: fadeOut 0.3s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0 }
+  to { opacity: 1 }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1 }
+  to { opacity: 0 }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0 }
+  to { transform: translateY(0); opacity: 1 }
+}
+`;
+document.head.appendChild(guestPopupStyle);
+
+/* ---------- Popup Logic ---------- */
+function showSubscriptionPopup() {
+  // Do NOT show for paid users
+  if (currentUser && currentUser.status === "Paid") return;
+
+  // Prevent stacking
+  if (document.querySelector(".guest-popup-overlay")) return;
+
+  const overlay = document.createElement("div");
+  overlay.className = "guest-popup-overlay";
+
+  overlay.innerHTML = `
+    <div class="guest-popup">
+      <h2>Welcome to MovieDrift</h2>
+
+      <p>
+        You’re currently watching in
+        <strong>${currentUser ? "Free Access" : "Guest Access"}</strong>
+      </p>
+
+      <p>
+        Unlock the full MovieDrift experience crafted for viewers who want
+        uninterrupted, premium entertainment.
+      </p>
+
+      <p class="price">Premium Access • KSh 150 / month</p>
+
+      <ul class="guest-benefits">
+        <li>✔ Unlimited movies & series</li>
+        <li>✔ Zero ads, zero interruptions</li>
+        <li>✔ Resume watching anytime</li>
+        <li>✔ Instant access to new episodes</li>
+      </ul>
+
+      <div class="guest-buttons">
+        <a
+          href="https://wa.me/254747436668?text=Hello%20MovieDrift%2C%20I%20would%20like%20to%20upgrade%20to%20Premium%20Access"
+          target="_blank"
+          class="guest-btn primary"
+        >
+          Get Premium Access
+        </a>
+
+        <button class="guest-btn secondary" id="guestLaterBtn">
+          Continue as Guest
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  document.getElementById("guestLaterBtn").onclick = () => {
+    overlay.classList.add("hide");
+    setTimeout(() => overlay.remove(), 300);
+  };
+}
+
+/* ---------- Show on Page Load ---------- */
+document.addEventListener("DOMContentLoaded", () => {
+  loadCurrentUser(); // your existing function
+
+  setTimeout(() => {
+    showSubscriptionPopup();
+  }, 4000);
+});
 
 // ---------------- BACK BUTTON HANDLING ----------------
 (function() {
@@ -4289,6 +4480,7 @@ animateCF();
 
 </body>
 </html>
+
 
 
 
