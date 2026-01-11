@@ -2971,7 +2971,7 @@ if (localStorage.getItem("playbackPositions")) {
   catch { playbackPositions = {}; }
 }
 
-/* ---------------- Episode Notifications System ---------------- */
+// ---------------- Episode Notifications System ----------------
 let episodeUnsubscriptions = {}; // store unsub functions per series
 
 /* Toast container */
@@ -2995,8 +2995,13 @@ style.innerHTML = `
 #toastContainer::-webkit-scrollbar { width:6px; }
 #toastContainer::-webkit-scrollbar-track { background:#111; }
 #toastContainer::-webkit-scrollbar-thumb { background:#00ff66; border-radius:10px; }
+.close-all-btn { position: sticky; top:0; z-index:3; background: linear-gradient(90deg,#ff4444,#ff0000); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:bold; cursor:pointer; margin-bottom:6px; }
+.close-all-btn:hover { opacity:0.85; }
 .professional-toast { background: linear-gradient(90deg,#1f1f1f,#333); color:#00ff66; padding:12px 20px; border-radius:10px; box-shadow:0 5px 20px rgba(0,0,0,0.4); font-family:'Segoe UI',sans-serif; font-weight:bold; min-width:250px; cursor:pointer; position:relative; display:flex; flex-direction:column; gap:5px; word-break:break-word; animation:slideIn 0.4s ease; }
 .professional-toast:hover { background:linear-gradient(90deg,#222,#444); }
+.professional-toast .toast-title { font-size:14px; font-weight:bold; }
+.professional-toast .toast-episode { font-size:13px; }
+.professional-toast .close-btn { position:absolute; top:5px; right:8px; cursor:pointer; color:#fff; font-weight:bold; font-size:14px; }
 @keyframes slideIn { from { transform:translateX(120%); opacity:0; } to { transform:translateX(0); opacity:1; } }
 /* Resume toast */
 .resume-toast { background:#111;color:#00ff66;padding:10px 14px;border-radius:8px;font-weight:bold;cursor:pointer;border:1px solid #00ff66; }
@@ -3004,16 +3009,39 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-/* ---------------- Episode Notification (only once ever) ---------------- */
+// Global Close All button
+const closeAllBtn = document.createElement("button");
+closeAllBtn.innerText = "× Close All";
+closeAllBtn.style = `
+  background: #ff4444;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 5px;
+  display: none;
+`;
+closeAllBtn.addEventListener("click", () => {
+  const allToasts = toastContainer.querySelectorAll(".professional-toast, .resume-toast");
+  allToasts.forEach(t => t.remove());
+  closeAllBtn.style.display = "none";
+});
+toastContainer.appendChild(closeAllBtn);
+
+/* ---------------- Episode Notification (once per episode, multiple allowed) ---------------- */
 function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
-  const notifiedEpisodes = JSON.parse(localStorage.getItem("notifiedEpisodes") || "{}");
-  if (notifiedEpisodes[episodeId]) return;
-  notifiedEpisodes[episodeId] = true;
-  localStorage.setItem("notifiedEpisodes", JSON.stringify(notifiedEpisodes));
+  const notified = JSON.parse(localStorage.getItem("notifiedEpisodes") || "{}");
 
-  const oldToasts = toastContainer.querySelectorAll(".professional-toast");
-  oldToasts.forEach(t => t.remove());
+  // Prevent duplicate notifications per episode
+  if (notified[episodeId]) return;
 
+  // Mark as notified
+  notified[episodeId] = true;
+  localStorage.setItem("notifiedEpisodes", JSON.stringify(notified));
+
+  // Create toast
   const toast = document.createElement("div");
   toast.className = "professional-toast";
   toast.innerHTML = `
@@ -3021,90 +3049,61 @@ function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
     <span class="toast-episode">Episode ${episodeNumber} Added</span>
     <span class="close-btn">&times;</span>
   `;
+
   toastContainer.appendChild(toast);
 
-  if (typeof closeAllBtn !== "undefined") closeAllBtn.style.display = "block";
-
+  // Close button handler
   toast.querySelector(".close-btn").addEventListener("click", () => {
     toast.remove();
-    if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length && typeof closeAllBtn !== "undefined") {
-      closeAllBtn.style.display = "none";
-    }
   });
 
-  toast.style.opacity = "0";
-  toast.style.transform = "translateX(100%)";
-  requestAnimationFrame(() => {
-    toast.style.transition = "all 0.5s ease";
-    toast.style.opacity = "1";
-    toast.style.transform = "translateX(0)";
-  });
-
+  // Auto-remove after 15 seconds
   setTimeout(() => {
-    if (!toast.isConnected) return;
-    toast.remove();
-    if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length && typeof closeAllBtn !== "undefined") {
-      closeAllBtn.style.display = "none";
-    }
-  }, 60000);
+    if (toast.isConnected) toast.remove();
+  }, 15000);
 }
 
-/* ---------------- Resume Toast ---------------- */
+/* Show Resume Notification */
 function showResumeToast(ep, index) {
-  if(!ep) return;
-  const time = playbackPositions[ep.id] ? formatTime(playbackPositions[ep.id]) : "0:00";
   const toast = document.createElement("div");
-  toast.className = "resume-toast professional-toast";
-  toast.innerHTML = `
-    <span class="toast-title">Resume Episode ${ep.epNumber || ep.ep || index+1} at ${time}</span>
-    <span style="font-size:12px;margin-top:4px;">Click to resume</span>
-  `;
+  toast.className = "resume-toast";
+  const time = playbackPositions[ep.id] ? formatTime(playbackPositions[ep.id]) : "0:00";
+  toast.innerHTML = `You left off Episode ${ep.epNumber || ep.ep || index+1} at ${time}. Click to resume`;
   toastContainer.appendChild(toast);
-  toast.addEventListener("click", ()=>{ playEpisode(index); toast.remove(); });
-  setTimeout(()=>toast.remove(), 15000);
+
+  toast.addEventListener("click", () => {
+    playEpisode(index);
+    toast.remove();
+  });
+
+  setTimeout(() => { toast.remove(); }, 15000);
 }
 
-/* ---------------- SRT -> VTT Conversion ---------------- */
-function srtToVtt(srtText) {
-  if (!srtText) return "";
-
-  // Normalize line endings
-  let text = srtText.replace(/\r\n|\r/g, "\n").trim();
-
-  // Remove SRT line numbers
-  text = text.replace(/^\d+\s*$/gm, "");
-
-  // Convert timestamps: 00:00:01,500 --> 00:00:05,000  =>  00:00:01.500 --> 00:00:05.000
-  text = text.replace(
-    /(\d{2}:\d{2}:\d{2}),(\d{3}) --> (\d{2}:\d{2}:\d{2}),(\d{3})/g,
-    "$1.$2 --> $3.$4"
-  );
-
-  // Add WEBVTT header
-  return "WEBVTT\n\n" + text;
+// format seconds to mm:ss
+function formatTime(sec) {
+  const m = Math.floor(sec/60);
+  const s = Math.floor(sec%60);
+  return `${m}:${s.toString().padStart(2,'0')}`;
 }
 
-/* ---------------- Attach Subtitle to Video ---------------- */
-async function attachSubtitle(videoElem, url, label) {
-  if (!url) return;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return console.warn("Subtitle fetch failed", url);
-    const srt = await res.text();
-    const vttBlob = new Blob([srtToVtt(srt)], { type: "text/vtt" });
-    const vttUrl = URL.createObjectURL(vttBlob);
-    const track = document.createElement("track");
-    track.kind = "subtitles";
-    track.label = label || "Subtitles";
-    track.src = vttUrl;
-    track.default = true;
-    videoElem.appendChild(track);
-    videoElem.textTracks[0].mode = "showing";
-  } catch (err) {
-    console.error("Subtitle conversion error", err);
-  }
+/* ---------------- Watch for new episodes ---------------- */
+function watchEpisodesNotifications(movieId, seriesTitle) {
+  const episodesColl = collection(db, "movies", movieId, "episodes");
+  const q = query(episodesColl);
+  let knownEpisodes = new Set();
+  return onSnapshot(q, snapshot => {
+    snapshot.docChanges().forEach(change => {
+      if (change.type === "added") {
+        const episode = { id: change.doc.id, ...change.doc.data() };
+        const epNumber = episode.epNumber || episode.ep || "";
+        if (!knownEpisodes.has(episode.id)) {
+          knownEpisodes.add(episode.id);
+          showEpisodeNotification(seriesTitle, episode.id, epNumber);
+        }
+      }
+    });
+  });
 }
-
 
 /* Fetch episodes */
 async function fetchEpisodesForMovie(movieId) {
@@ -3129,31 +3128,12 @@ function watchEpisodes(movieId) {
     /* Fixed buttons on top */
     const fixedNav = document.createElement("div");
     fixedNav.style=`display:flex; justify-content:center; gap:10px; padding:10px 0; background:#111; color:#00ff66; border-radius:6px; margin-bottom:10px; position:sticky; top:0; z-index:9999;`;
-
-    const prevBtn=document.createElement("button"); 
-    prevBtn.innerText="⏮ Previous"; 
-    prevBtn.style="padding:8px 14px;background:#00ff66;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;";
-
-    const resumeBtn=document.createElement("button"); 
-    resumeBtn.innerText="▶ Resume"; 
-    resumeBtn.style="padding:8px 14px;background:#00ff66;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;";
-
-    const nextBtn=document.createElement("button"); 
-    nextBtn.innerText="⏭ Next"; 
-    nextBtn.style="padding:8px 14px;background:#00ff66;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;";
-
-    // Subtitle selector
-    const subtitleSelect = document.createElement("select");
-    subtitleSelect.style="padding:8px 14px;background:#111;color:#00ff66;border-radius:6px;border:1px solid #00ff66;font-weight:bold;cursor:pointer;";
-    subtitleSelect.innerHTML = `<option value="">CC / Subtitles</option>`;
-
-    fixedNav.appendChild(prevBtn); 
-    fixedNav.appendChild(resumeBtn); 
-    fixedNav.appendChild(nextBtn);
-    fixedNav.appendChild(subtitleSelect);
+    const prevBtn=document.createElement("button"); prevBtn.innerText="⏮ Previous"; prevBtn.style="padding:8px 14px;background:#00ff66;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;";
+    const resumeBtn=document.createElement("button"); resumeBtn.innerText="▶ Resume"; resumeBtn.style="padding:8px 14px;background:#00ff66;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;";
+    const nextBtn=document.createElement("button"); nextBtn.innerText="⏭ Next"; nextBtn.style="padding:8px 14px;background:#00ff66;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;";
+    fixedNav.appendChild(prevBtn); fixedNav.appendChild(resumeBtn); fixedNav.appendChild(nextBtn);
     episodeListContainer.prepend(fixedNav);
 
-    /* Update buttons function */
     function updateButtons(index) {
       currentEpisodeIndex=index;
       prevBtn.disabled=index===0;
@@ -3165,30 +3145,7 @@ function watchEpisodes(movieId) {
         const video=document.querySelector(".episode-video-wrapper video");
         if(video){ video.currentTime=playbackPositions[ep.id]||0; video.play(); }
       };
-
-      // Populate subtitle selector for current episode
-      const ep = currentEpisodeList[index];
-      subtitleSelect.innerHTML = `<option value="">CC / Subtitles</option>`;
-      if(ep.subtitles && ep.subtitles.length){
-        ep.subtitles.forEach((sub,i)=>{
-          const option = document.createElement("option");
-          option.value = sub.url;
-          option.textContent = sub.label || `Track ${i+1}`;
-          subtitleSelect.appendChild(option);
-        });
-      }
     }
-
-    // Subtitle selector logic with SRT support
-    subtitleSelect.addEventListener("change", e => {
-      const video = document.querySelector(".episode-video-wrapper video");
-      if(!video) return;
-      const oldTrack = video.querySelector("track");
-      if(oldTrack) oldTrack.remove();
-      const subUrl = e.target.value;
-      const subLabel = subtitleSelect.selectedOptions[0].textContent;
-      if(subUrl) attachSubtitle(video, subUrl, subLabel);
-    });
 
     function playEpisode(index){
       const ep=currentEpisodeList[index]; if(!ep) return;
@@ -3202,21 +3159,11 @@ function watchEpisodes(movieId) {
       wrapper.style="margin-top:10px;position:relative;width:100%;max-height:400px;background:#000;";
 
       if(playable){
-        wrapper.innerHTML=`<video controls autoplay style="width:100%;max-height:400px;"></video>
+        wrapper.innerHTML=`<video controls autoplay src="${epUrl}" style="width:100%;max-height:400px;"></video>
                            <a href="${epUrl}" download style="display:inline-block;margin-top:8px;background:#00ff66;padding:6px 10px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">⬇ Download</a>`;
         const videoElem=wrapper.querySelector("video");
-        videoElem.src = epUrl;
         if(playbackPositions[ep.id]) videoElem.currentTime=playbackPositions[ep.id];
-        videoElem.addEventListener("timeupdate",()=>{ 
-          playbackPositions[ep.id]=videoElem.currentTime; 
-          localStorage.setItem("playbackPositions", JSON.stringify(playbackPositions)); 
-        });
-
-        // Attach first subtitle automatically
-        if(ep.subtitles && ep.subtitles.length){
-          attachSubtitle(videoElem, ep.subtitles[0].url, ep.subtitles[0].label || "Subtitles");
-        }
-
+        videoElem.addEventListener("timeupdate",()=>{ playbackPositions[ep.id]=videoElem.currentTime; localStorage.setItem("playbackPositions", JSON.stringify(playbackPositions)); });
       } else {
         wrapper.innerHTML=`<iframe src="${epUrl}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
       }
@@ -3248,6 +3195,7 @@ function watchEpisodes(movieId) {
       seasonDiv.querySelector("h5").addEventListener("click",()=>{ epsGrid.style.display=epsGrid.style.display==="none"?"grid":"none"; });
     });
 
+    // Show resume notification if playback exists
     const lastIndex=currentEpisodeList.findIndex(ep=>playbackPositions[ep.id]);
     if(lastIndex!==-1) showResumeToast(currentEpisodeList[lastIndex], lastIndex);
   });
@@ -4532,18 +4480,3 @@ animateCF();
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
