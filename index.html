@@ -1943,7 +1943,7 @@ btn.addEventListener("click", () => {
       <input id="authPassword" placeholder="Password (6+ chars)" type="password">
       <div class="auth-buttons">
         <button id="signInBtn" class="btn">Sign In</button>
-        <button id="registerBtn" class="btn"></button>
+        <button id="registerBtn" class="btn">Create Account</button>
       </div>
       <div class="auth-note">
         If you have no account, contact our team to be registered.
@@ -2686,30 +2686,24 @@ const deviceId = getDeviceId();
 
 /* ---------------- ENFORCE DEVICE LIMIT ---------------- */
 async function enforceDeviceLimit(user, allowForceLogout = false) {
-  // Always fetch the latest allowed devices from Firestore
   const snap = await getDoc(doc(db, "users", user.id));
   const latestUser = snap.data();
   const allowed = latestUser.devicesAllowed || 1;
 
   let active = (latestUser.activeDevices || []).filter(d => typeof d === "string" && d.trim() !== "");
 
-  // If current device is already active, allow login
   if (active.includes(deviceId)) return;
 
-  // If device limit reached
   if (active.length >= allowed) {
     if (allowForceLogout) {
-      // Log out oldest device to free slot
       const updatedDevices = active.slice(1);
       await updateDoc(doc(db, "users", user.id), { activeDevices: [...updatedDevices, deviceId] });
       return;
     } else {
-      // Prevent login and show message
       throw new Error("🚫 Device limit exceeded. Please upgrade for more devices.");
     }
   }
 
-  // Otherwise, add this device to active devices
   active.push(deviceId);
   await updateDoc(doc(db, "users", user.id), { activeDevices: active });
 }
@@ -2718,12 +2712,12 @@ async function enforceDeviceLimit(user, allowForceLogout = false) {
 async function loginUser(identifier, password) {
   const usersRef = collection(db, "users");
 
-  // 1️⃣ Query by email
+  // Query by email first
   let q = query(usersRef, where("email", "==", identifier));
   let snapshot = await getDocs(q);
 
-  // 2️⃣ If not found, query by username
   if (snapshot.empty) {
+    // Then query by username
     q = query(usersRef, where("username", "==", identifier));
     snapshot = await getDocs(q);
     if (snapshot.empty) return alert("❌ User not found");
@@ -2732,27 +2726,44 @@ async function loginUser(identifier, password) {
   const userDoc = snapshot.docs[0];
   const user = { id: userDoc.id, ...userDoc.data() };
 
-  // 3️⃣ Check password
+  // Check password
   if (user.password !== password) return alert("❌ Incorrect password");
 
-  // 4️⃣ Check subscription expiry
-  if (Date.now() >= user.subscriptionExpiresAt) {
-    await updateDoc(doc(db, "users", user.id), { status: "Unpaid", activeDevices: [] });
-    return alert("❌ Your subscription has expired. Please renew.");
+  // Check account status
+  if (user.status === "Pending") {
+    return alert(
+      "⏳ Your account is pending payment.\n" +
+      "Please make payment via M-Pesa 0717436668.\n" +
+      "Admin will activate your account once payment is confirmed."
+    );
   }
 
-  // 5️⃣ Enforce device limit (fetch latest devicesAllowed from admin)
+  if (user.status === "Unpaid") {
+    return alert(
+      "❌ Your account is inactive or expired.\n" +
+      "Please contact our team to reactivate it."
+    );
+  }
+
+  // Auto-expire subscription if past expiry
+  if (user.subscriptionExpiresAt && Date.now() >= user.subscriptionExpiresAt && user.status === "Paid") {
+    await updateDoc(doc(db, "users", user.id), { status: "Unpaid", activeDevices: [] });
+    return alert(
+      "❌ Your subscription has expired.\n" +
+      "Please contact our team to reactivate your account."
+    );
+  }
+
+  // Enforce device limit
   try {
-    await enforceDeviceLimit(user); // Will throw error if limit exceeded
+    await enforceDeviceLimit(user);
   } catch (err) {
     return alert(err.message);
   }
 
-  // 6️⃣ Save current user locally (for session)
+  // Login successful
   currentUser = user;
   saveCurrentUser();
-
-  // 7️⃣ Start real-time tracking for subscription/status updates
   watchUserStatus();
 
   alert(`✅ Logged in successfully as ${user.username}`);
@@ -2786,7 +2797,6 @@ async function canPlayVideo(userId) {
   const allowed = user.devicesAllowed || 1;
   let active = user.activeDevices || [];
 
-  // Check current device
   if (!active.includes(deviceId)) {
     if (active.length >= allowed) {
       alert("🚫 Device limit reached. Cannot play video. Upgrade subscription or logout from other devices.");
@@ -2805,6 +2815,42 @@ registerBtn.onclick = () => registerUser(authIdentifier.value.trim(), authPasswo
 openAuthBtn.onclick = () => openAuthModal();
 guestLoginBtn.onclick = () => openAuthModal();
 logoutBtn.onclick = () => { currentUser = null; saveCurrentUser(); updateAuthUI(); };
+async function registerUser(identifier, password) {
+  identifier = identifier.trim().toLowerCase();
+
+  if (password.length < 6) {
+    alert("Password must be 6+ characters");
+    return;
+  }
+
+  const usersRef = collection(db, "users");
+  const q = query(usersRef, where("email", "==", identifier));
+  const snapshot = await getDocs(q);
+
+  if (!snapshot.empty) {
+    alert("User already exists");
+    return;
+  }
+
+  // Create user as PENDING (not approved yet)
+  await addDoc(usersRef, {
+    email: identifier,
+    password: password,
+    createdAt: Date.now(),
+    status: "Pending"
+  });
+
+  alert(
+    "✅ Account created successfully!\n\n" +
+    "⚠️ Your account is pending approval.\n\n" +
+    "Please make payment via M-Pesa to:\n" +
+    "📞 0717436668\n\n" +
+    "After payment, wait for admin approval before logging in."
+  );
+
+  // Do NOT log in user yet
+  closeModal("authModal");
+}
 
 /* Modals */
 function openAuthModal(){authModal.style.display='flex';}
@@ -4480,3 +4526,4 @@ animateCF();
 
 </body>
 </html>
+
