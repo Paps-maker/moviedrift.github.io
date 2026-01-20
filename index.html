@@ -3452,7 +3452,7 @@ window.viewAndPlayByFiltered = function(index) {
       videoElem.src = m.fileUrl;
       videoElem.style.width = "100%";
       videoElem.style.maxHeight = "500px";
-      videoElem.playsInline = true; // Important for iPhone playback
+      videoElem.playsInline = true; // iPhone inline playback
       videoElem.preload = "metadata";
 
       // Restore last playback position
@@ -3496,7 +3496,7 @@ window.viewAndPlayByFiltered = function(index) {
 
       // Play video on button click
       playButton.addEventListener("click", () => {
-        videoElem.play();
+        videoElem.play().catch(err => console.log(err));
         playButton.style.display = "none";
       });
 
@@ -3519,7 +3519,7 @@ window.viewAndPlayByFiltered = function(index) {
 
         resumeToast.querySelector("#resumeMovieBtn").onclick = () => {
           videoElem.currentTime = lastTime;
-          videoElem.play();
+          videoElem.play().catch(err => console.log(err));
           playButton.style.display = "none"; // Hide overlay if resuming
           resumeToast.remove();
           if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length)
@@ -3528,7 +3528,7 @@ window.viewAndPlayByFiltered = function(index) {
 
         resumeToast.querySelector("#restartMovieBtn").onclick = () => {
           videoElem.currentTime = 0;
-          videoElem.play();
+          videoElem.play().catch(err => console.log(err));
           playButton.style.display = "none"; // Hide overlay if restarting
           resumeToast.remove();
           if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length)
@@ -4659,6 +4659,7 @@ animateCF();
 
 </body>
 </html>
+
 
 
 
