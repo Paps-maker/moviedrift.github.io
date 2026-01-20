@@ -3230,14 +3230,14 @@ function watchEpisodes(movieId) {
   `;
 
   if(playable){
-    // Create video element but don't autoplay
     const videoElem = document.createElement("video");
     videoElem.controls = true;
     videoElem.src = epUrl;
     videoElem.style.width = "100%";
     videoElem.style.maxHeight = "400px";
-    videoElem.playsInline = true; // Important for iPhones
+    videoElem.playsInline = true;  // important for iOS
     videoElem.preload = "metadata";
+    videoElem.muted = true;        // iOS allows play only if muted
 
     // Restore last playback position
     if(playbackPositions[ep.id]) videoElem.currentTime = playbackPositions[ep.id];
@@ -3248,7 +3248,7 @@ function watchEpisodes(movieId) {
       localStorage.setItem("playbackPositions", JSON.stringify(playbackPositions));
     });
 
-    // Create green round overlay play button
+    // Green round overlay play button
     const playButton = document.createElement("button");
     playButton.textContent = "▶";
     playButton.style = `
@@ -3278,9 +3278,12 @@ function watchEpisodes(movieId) {
       playButton.style.boxShadow = "0 4px 15px rgba(0,0,0,0.3)";
     };
 
-    // Play video on button click
+    // Play video on click — unmute for user
     playButton.addEventListener("click", () => {
-      videoElem.play();
+      videoElem.muted = false;  // unmute on user interaction
+      videoElem.play().catch(err => {
+        console.log("Playback failed:", err);
+      });
       playButton.style.display = "none";
     });
 
@@ -4656,5 +4659,6 @@ animateCF();
 
 </body>
 </html>
+
 
 
