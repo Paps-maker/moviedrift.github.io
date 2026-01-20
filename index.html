@@ -3205,7 +3205,7 @@ function watchEpisodes(movieId) {
       };
     }
 
-   function playEpisode(index){
+  function playEpisode(index){
   const ep = currentEpisodeList[index]; 
   if(!ep) return;
 
@@ -3218,7 +3218,16 @@ function watchEpisodes(movieId) {
 
   const wrapper = document.createElement("div");
   wrapper.className = "episode-video-wrapper";
-  wrapper.style = "margin-top:10px;position:relative;width:100%;max-height:400px;background:#000;display:flex;justify-content:center;align-items:center;";
+  wrapper.style = `
+    margin-top:10px;
+    position:relative;
+    width:100%;
+    max-height:400px;
+    background:#000;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+  `;
 
   if(playable){
     // Create video element but don't autoplay
@@ -3227,6 +3236,8 @@ function watchEpisodes(movieId) {
     videoElem.src = epUrl;
     videoElem.style.width = "100%";
     videoElem.style.maxHeight = "400px";
+    videoElem.playsInline = true; // Important for iPhones
+    videoElem.preload = "metadata";
 
     // Restore last playback position
     if(playbackPositions[ep.id]) videoElem.currentTime = playbackPositions[ep.id];
@@ -3237,22 +3248,37 @@ function watchEpisodes(movieId) {
       localStorage.setItem("playbackPositions", JSON.stringify(playbackPositions));
     });
 
-    // Create overlay play button
+    // Create green round overlay play button
     const playButton = document.createElement("button");
-    playButton.textContent = "▶ Play";
+    playButton.textContent = "▶";
     playButton.style = `
       position:absolute;
-      background:#00ff66; /* green */
+      top:50%;
+      left:50%;
+      transform:translate(-50%,-50%);
+      background:#00ff66;
       color:black;
       border:none;
-      font-size:24px;
-      padding:12px 24px;
-      border-radius:8px;
+      font-size:28px;
+      padding:20px;
+      border-radius:50%;
       cursor:pointer;
+      box-shadow:0 4px 15px rgba(0,0,0,0.3);
       z-index:10;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     `;
-    
-    // On click, start video and hide button
+
+    // Hover effect
+    playButton.onmouseover = () => {
+      playButton.style.transform = "translate(-50%, -50%) scale(1.1)";
+      playButton.style.boxShadow = "0 6px 20px rgba(0,0,0,0.4)";
+    };
+    playButton.onmouseout = () => {
+      playButton.style.transform = "translate(-50%, -50%) scale(1)";
+      playButton.style.boxShadow = "0 4px 15px rgba(0,0,0,0.3)";
+    };
+
+    // Play video on button click
     playButton.addEventListener("click", () => {
       videoElem.play();
       playButton.style.display = "none";
@@ -3405,7 +3431,16 @@ window.viewAndPlayByFiltered = function(index) {
     const direct = isDownloadable(m.fileUrl);
 
     let movieWrapper = document.createElement("div");
-    movieWrapper.style = "position:relative;width:100%;max-height:500px;background:#000;margin-top:10px;display:flex;justify-content:center;align-items:center;";
+    movieWrapper.style = `
+      position:relative;
+      width:100%;
+      max-height:500px;
+      background:#000;
+      margin-top:10px;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+    `;
     
     if (direct) {
       // Create video element without autoplay
@@ -3414,6 +3449,8 @@ window.viewAndPlayByFiltered = function(index) {
       videoElem.src = m.fileUrl;
       videoElem.style.width = "100%";
       videoElem.style.maxHeight = "500px";
+      videoElem.playsInline = true; // Important for iPhone playback
+      videoElem.preload = "metadata";
 
       // Restore last playback position
       if (lastTime > 0) videoElem.currentTime = lastTime;
@@ -3424,21 +3461,37 @@ window.viewAndPlayByFiltered = function(index) {
         localStorage.setItem("moviePlaybackPositions", JSON.stringify(playbackPositions));
       });
 
-      // Create green play button overlay
+      // Create green round play button overlay
       const playButton = document.createElement("button");
-      playButton.textContent = "▶ Play";
+      playButton.textContent = "▶";
       playButton.style = `
         position:absolute;
+        top:50%;
+        left:50%;
+        transform:translate(-50%, -50%);
         background:#00ff66;
         color:black;
         border:none;
-        font-size:24px;
-        padding:12px 24px;
-        border-radius:8px;
+        font-size:28px;
+        padding:20px;
+        border-radius:50%;
         cursor:pointer;
+        box-shadow:0 4px 15px rgba(0,0,0,0.3);
         z-index:10;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
       `;
-      
+
+      // Hover effect
+      playButton.onmouseover = () => {
+        playButton.style.transform = "translate(-50%, -50%) scale(1.1)";
+        playButton.style.boxShadow = "0 6px 20px rgba(0,0,0,0.4)";
+      };
+      playButton.onmouseout = () => {
+        playButton.style.transform = "translate(-50%, -50%) scale(1)";
+        playButton.style.boxShadow = "0 4px 15px rgba(0,0,0,0.3)";
+      };
+
+      // Play video on button click
       playButton.addEventListener("click", () => {
         videoElem.play();
         playButton.style.display = "none";
@@ -4603,4 +4656,5 @@ animateCF();
 
 </body>
 </html>
+
 
