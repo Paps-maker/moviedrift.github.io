@@ -3205,30 +3205,69 @@ function watchEpisodes(movieId) {
       };
     }
 
-    function playEpisode(index){
-      const ep=currentEpisodeList[index]; if(!ep) return;
-      const player=document.getElementById("modalPlayer");
-      const epUrl=ep.fileUrl||ep.url;
-      const playable=isDownloadable(epUrl);
-      const existing=player.querySelector(".episode-video-wrapper"); if(existing) existing.remove();
+   function playEpisode(index){
+  const ep = currentEpisodeList[index]; 
+  if(!ep) return;
 
-      const wrapper=document.createElement("div");
-      wrapper.className="episode-video-wrapper";
-      wrapper.style="margin-top:10px;position:relative;width:100%;max-height:400px;background:#000;";
+  const player = document.getElementById("modalPlayer");
+  const epUrl = ep.fileUrl || ep.url;
+  const playable = isDownloadable(epUrl);
 
-      if(playable){
-        wrapper.innerHTML=`<video controls autoplay src="${epUrl}" style="width:100%;max-height:400px;"></video>
-                           <a href="${epUrl}" download style="display:inline-block;margin-top:8px;background:#00ff66;padding:6px 10px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">⬇ Download</a>`;
-        const videoElem=wrapper.querySelector("video");
-        if(playbackPositions[ep.id]) videoElem.currentTime=playbackPositions[ep.id];
-        videoElem.addEventListener("timeupdate",()=>{ playbackPositions[ep.id]=videoElem.currentTime; localStorage.setItem("playbackPositions", JSON.stringify(playbackPositions)); });
-      } else {
-        wrapper.innerHTML=`<iframe src="${epUrl}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
-      }
+  const existing = player.querySelector(".episode-video-wrapper");
+  if(existing) existing.remove();
 
-      player.appendChild(wrapper);
-      updateButtons(index);
-    }
+  const wrapper = document.createElement("div");
+  wrapper.className = "episode-video-wrapper";
+  wrapper.style = "margin-top:10px;position:relative;width:100%;max-height:400px;background:#000;display:flex;justify-content:center;align-items:center;";
+
+  if(playable){
+    // Create video element but don't autoplay
+    const videoElem = document.createElement("video");
+    videoElem.controls = true;
+    videoElem.src = epUrl;
+    videoElem.style.width = "100%";
+    videoElem.style.maxHeight = "400px";
+
+    // Restore last playback position
+    if(playbackPositions[ep.id]) videoElem.currentTime = playbackPositions[ep.id];
+
+    // Track playback position
+    videoElem.addEventListener("timeupdate", () => {
+      playbackPositions[ep.id] = videoElem.currentTime;
+      localStorage.setItem("playbackPositions", JSON.stringify(playbackPositions));
+    });
+
+    // Create overlay play button
+    const playButton = document.createElement("button");
+    playButton.textContent = "▶ Play";
+    playButton.style = `
+      position:absolute;
+      background:#00ff66; /* green */
+      color:black;
+      border:none;
+      font-size:24px;
+      padding:12px 24px;
+      border-radius:8px;
+      cursor:pointer;
+      z-index:10;
+    `;
+    
+    // On click, start video and hide button
+    playButton.addEventListener("click", () => {
+      videoElem.play();
+      playButton.style.display = "none";
+    });
+
+    wrapper.appendChild(videoElem);
+    wrapper.appendChild(playButton);
+
+  } else {
+    wrapper.innerHTML = `<iframe src="${epUrl}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
+  }
+
+  player.appendChild(wrapper);
+  updateButtons(index);
+}
 
     /* ---- Group episodes by season ---- */
     const seasonsMap={};
@@ -3366,17 +3405,49 @@ window.viewAndPlayByFiltered = function(index) {
     const direct = isDownloadable(m.fileUrl);
 
     let movieWrapper = document.createElement("div");
-    movieWrapper.style = "position:relative;width:100%;max-height:500px;background:#000;margin-top:10px;";
+    movieWrapper.style = "position:relative;width:100%;max-height:500px;background:#000;margin-top:10px;display:flex;justify-content:center;align-items:center;";
     
     if (direct) {
-      movieWrapper.innerHTML = `
-        <video controls autoplay src="${m.fileUrl}" style="width:100%;max-height:500px;"></video>
-        <a href="${m.fileUrl}" download style="display:inline-block;margin-top:10px;background:#00ff66;
-           padding:10px 15px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">⬇ Download</a>
-      `;
-      const videoElem = movieWrapper.querySelector("video");
+      // Create video element without autoplay
+      const videoElem = document.createElement("video");
+      videoElem.controls = true;
+      videoElem.src = m.fileUrl;
+      videoElem.style.width = "100%";
+      videoElem.style.maxHeight = "500px";
 
-      // Resume logic
+      // Restore last playback position
+      if (lastTime > 0) videoElem.currentTime = lastTime;
+
+      // Track playback positions
+      videoElem.addEventListener("timeupdate", () => {
+        playbackPositions[movieId] = videoElem.currentTime;
+        localStorage.setItem("moviePlaybackPositions", JSON.stringify(playbackPositions));
+      });
+
+      // Create green play button overlay
+      const playButton = document.createElement("button");
+      playButton.textContent = "▶ Play";
+      playButton.style = `
+        position:absolute;
+        background:#00ff66;
+        color:black;
+        border:none;
+        font-size:24px;
+        padding:12px 24px;
+        border-radius:8px;
+        cursor:pointer;
+        z-index:10;
+      `;
+      
+      playButton.addEventListener("click", () => {
+        videoElem.play();
+        playButton.style.display = "none";
+      });
+
+      movieWrapper.appendChild(videoElem);
+      movieWrapper.appendChild(playButton);
+
+      // Resume toast if needed
       if (lastTime > 0) {
         const resumeToast = document.createElement("div");
         resumeToast.className = "professional-toast resume-toast";
@@ -3390,30 +3461,24 @@ window.viewAndPlayByFiltered = function(index) {
         toastContainer.appendChild(resumeToast);
         closeAllBtn.style.display = "block";
 
-        // Resume button
         resumeToast.querySelector("#resumeMovieBtn").onclick = () => {
           videoElem.currentTime = lastTime;
           videoElem.play();
+          playButton.style.display = "none"; // Hide overlay if resuming
           resumeToast.remove();
           if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length)
             closeAllBtn.style.display = "none";
         };
 
-        // Restart button
         resumeToast.querySelector("#restartMovieBtn").onclick = () => {
           videoElem.currentTime = 0;
           videoElem.play();
+          playButton.style.display = "none"; // Hide overlay if restarting
           resumeToast.remove();
           if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length)
             closeAllBtn.style.display = "none";
         };
       }
-
-      // Update playback positions
-      videoElem.addEventListener("timeupdate", () => {
-        playbackPositions[movieId] = videoElem.currentTime;
-        localStorage.setItem("moviePlaybackPositions", JSON.stringify(playbackPositions));
-      });
 
     } else {
       movieWrapper.innerHTML = `<iframe src="${m.fileUrl}" frameborder="0" allowfullscreen style="width:100%;height:500px;"></iframe>`;
@@ -3421,7 +3486,6 @@ window.viewAndPlayByFiltered = function(index) {
 
     player.appendChild(movieWrapper);
   }
-
 
   if (m.type === "Series") {
     if (episodeUnsub) episodeUnsub();
@@ -3436,6 +3500,7 @@ window.viewAndPlayByFiltered = function(index) {
   document.getElementById("movieModal").style.display = "flex";
   document.getElementById("modalAddToList").onclick = () => addToWatchlistByFiltered(index);
 };
+
 /* =========================================================
    GUEST / UNPAID SUBSCRIPTION POPUP (MovieDrift)
    - Shows on page load
@@ -4538,3 +4603,4 @@ animateCF();
 
 </body>
 </html>
+
