@@ -1800,7 +1800,7 @@ btn.addEventListener("click", () => {
     <span class="close" onclick="closeModal('guestModal')">&times;</span>
     <h2 id="guestGreeting">Welcome</h2>
     <p id="guestMessage"></p>
-    <p style="color:var(--muted)">To enjoy streaming, downloads and add-to-list features you must have a premium account (150 KSh / month).</p>
+    <p style="color:var(--muted)">To enjoy streaming, downloads and add-to-list features you must have a premium account (50 KSh / month).</p>
     <div class="guest-cta">
       <a id="callLink" class="call-btn" href="tel:+254747436668"> Call Us</a>
       <a id="waLink" class="wa-btn" href="https://wa.me/254747436668"> WhatsApp</a>
@@ -2733,7 +2733,7 @@ async function loginUser(identifier, password) {
   if (user.status === "Pending") {
     return alert(
       "⏳ Your account is pending payment.\n" +
-      "Please make payment via M-Pesa 0717436668.\n" +
+      "Please make payment via M-Pesa Paybill 400200 ACC 1128286.\n" +
       "Admin will activate your account once payment is confirmed."
     );
   }
@@ -2844,8 +2844,8 @@ async function registerUser(identifier, password) {
     "✅ Account created successfully!\n\n" +
     "⚠️ Your account is pending approval.\n\n" +
     "Please make payment via M-Pesa to:\n" +
-    "Mpesa- 0717436668 (Livingstone)\n\n" +
-    "After payment, wait for admin approval before logging in you can also call for confirmation ."
+    "Mpesa- Paybill 400200 ACC 1128286\n\n" +
+    "After payment, wait for admin approval before logging in you can also call for confirmation 0747436668."
   );
 
   // Do NOT log in user yet
