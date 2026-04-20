@@ -2067,12 +2067,11 @@ import {
   where,
   getDocs,
   addDoc,
-  getDoc,      // <-- ADD THIS
-  updateDoc,   // <-- you also use updateDoc
-  deleteDoc,   // <-- you also use deleteDoc
+  getDoc,
+  updateDoc,
+  deleteDoc,
   orderBy
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-
 
 const firebaseConfig = {
   apiKey: "AIzaSyD2gkLs17Oa_dxIGu1FpOaDKAvGZwj_EFA",
@@ -2083,17 +2082,19 @@ const firebaseConfig = {
   appId: "1:97331968745:web:a93ff0bd2c383800dcce78",
   measurementId: "G-JPPCZ3M4G2"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// Global State
 let movies = [];
 let watchlist = JSON.parse(localStorage.getItem("watchlist")) || [];
 let currentUser = null;
+let episodeUnsub = null;
 
+// UI elements
 const genreFilter = document.getElementById("genreFilter");
 const yearFilter = document.getElementById("yearFilter");
-
-/* UI elements */
 const openAuthBtn = document.getElementById('openAuthBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const authModal = document.getElementById('authModal');
@@ -2107,92 +2108,82 @@ const guestGreeting = document.getElementById('guestGreeting');
 const guestMessage = document.getElementById('guestMessage');
 const callLink = document.getElementById('callLink');
 const waLink = document.getElementById('waLink');
+const trendingOverlay = document.getElementById("trendingOverlay");
+const trendingSection = document.getElementById("trendingSection");
+const trendingCarousel = document.getElementById("trendingCarousel");
+const toggleTrendingBtn = document.getElementById("toggleTrending");
 
 /* ---------------- Persistent login & status tracking ---------------- */
 function saveCurrentUser() {
-  if(currentUser) localStorage.setItem('currentUser', JSON.stringify(currentUser));
+  if (currentUser) localStorage.setItem('currentUser', JSON.stringify(currentUser));
   else localStorage.removeItem('currentUser');
 }
 
 function loadCurrentUser() {
   const saved = localStorage.getItem('currentUser');
-  if(saved) currentUser = JSON.parse(saved);
-  if(currentUser) watchUserStatus(); // Track status changes in real-time
+  if (saved) {
+    currentUser = JSON.parse(saved);
+    watchUserStatus();
+  }
 }
 
 function watchUserStatus() {
   if (!currentUser) return;
   const userDocRef = doc(db, "users", currentUser.id);
   onSnapshot(userDocRef, docSnap => {
-    if(docSnap.exists()){
+    if (docSnap.exists()) {
       currentUser.status = docSnap.data().status || "Unpaid";
       saveCurrentUser();
     }
   });
 }
 
+/* ---------------- Movie Data & Trending Logic ---------------- */
 onSnapshot(collection(db, "movies"), snapshot => {
   movies = snapshot.docs.map(d => {
     const data = d.data();
-    const createdAt = data.createdAt?.seconds ? data.createdAt.seconds*1000 : data.createdAt||0;
-    const year = parseInt(data.year)||0;
-    return { id:d.id, ...data, createdAt, year };
-  }).sort((a,b)=> b.year!==a.year ? b.year-a.year : b.createdAt-a.createdAt);
+    const createdAt = data.createdAt?.seconds ? data.createdAt.seconds * 1000 : data.createdAt || 0;
+    const year = parseInt(data.year) || 0;
+    return { id: d.id, ...data, createdAt, year };
+  }).sort((a, b) => b.year !== a.year ? b.year - a.year : b.createdAt - a.createdAt);
 
   populateFilters();
   renderMovies();
+  setupTrendingUI();
+  populateTopRated();
+});
 
-  /* ================= TRENDING MODAL – FINAL STABLE VERSION WITH ❌ & CLICK-CLOSE ================= */
+function setupTrendingUI() {
+  if (!trendingSection) return;
+  
+  // Prevent duplicate close buttons
+  if (!document.getElementById("closeTrendingBtn")) {
+    let closeBtn = document.createElement("button");
+    closeBtn.id = "closeTrendingBtn";
+    closeBtn.innerText = "✕";
+    closeBtn.className = "close-trending-style"; // Use CSS for styling if possible
+    Object.assign(closeBtn.style, {
+      position: "absolute", top: "12px", right: "12px", background: "rgba(0,0,0,0.7)",
+      color: "#fff", border: "none", fontSize: "20px", cursor: "pointer", zIndex: "100000", padding: "4px 8px"
+    });
+    trendingSection.appendChild(closeBtn);
+    closeBtn.onclick = closeTrending;
+  }
+}
 
-const trendingOverlay   = document.getElementById("trendingOverlay");
-const trendingSection   = document.getElementById("trendingSection");
-const trendingCarousel  = document.getElementById("trendingCarousel");
-const toggleTrendingBtn = document.getElementById("toggleTrending");
-
-/* ---------- CREATE CLOSE ❌ BUTTON ---------- */
-let closeBtn = document.createElement("button");
-closeBtn.id = "closeTrendingBtn";
-closeBtn.innerText = "✕";
-closeBtn.style.position = "absolute";
-closeBtn.style.top = "12px";
-closeBtn.style.right = "12px";
-closeBtn.style.background = "rgba(0,0,0,0.7)";
-closeBtn.style.color = "#fff";
-closeBtn.style.border = "none";
-closeBtn.style.fontSize = "20px";
-closeBtn.style.cursor = "pointer";
-closeBtn.style.zIndex = "100000";
-closeBtn.style.padding = "4px 8px";
-trendingSection.appendChild(closeBtn);
-
-/* ---------- OPEN ---------- */
 function openTrending() {
   trendingOverlay.style.display = "block";
   document.body.style.overflow = "hidden";
-
-  ensureTrendingContent();
+  populateTrending();
 }
 
-/* ---------- CLOSE ---------- */
 function closeTrending() {
   trendingOverlay.style.display = "none";
   document.body.style.overflow = "";
 }
 
-/* ---------- ENSURE CONTENT ALWAYS EXISTS ---------- */
-function ensureTrendingContent() {
-  if (!Array.isArray(movies) || movies.length === 0) {
-    setTimeout(ensureTrendingContent, 100);
-    return;
-  }
-
-  populateTrending(); // always rebuild safely
-}
-
-/* ---------- POPULATE TRENDING (UNCHANGED LOGIC + CLOSE ON CLICK) ---------- */
 function populateTrending() {
   trendingCarousel.innerHTML = "";
-
   const trending = [...movies]
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     .slice(0, 20);
@@ -2205,49 +2196,19 @@ function populateTrending() {
       <div class="title">${m.title}</div>
       <div class="rating">⭐ ${m.rating ? m.rating.toFixed(1) : "N/A"}</div>
     `;
-
     card.onclick = () => {
       protectedAction("watch", movies.findIndex(x => x.id === m.id));
-      closeTrending(); // 🔥 Close modal when poster is clicked
+      closeTrending();
     };
-
     trendingCarousel.appendChild(card);
   });
 }
 
-/* ---------- EVENTS ---------- */
-
-/* Open button */
-toggleTrendingBtn.addEventListener("click", e => {
-  e.stopPropagation();
-  openTrending();
-});
-
-/* Close on overlay click */
-trendingOverlay.addEventListener("click", closeTrending);
-
-/* Prevent close when clicking inside */
-trendingSection.addEventListener("click", e => e.stopPropagation());
-
-/* Close via ❌ button */
-closeBtn.addEventListener("click", e => {
-  e.stopPropagation();
-  closeTrending();
-});
-
-/* ESC close */
-document.addEventListener("keydown", e => {
-  if (e.key === "Escape" && trendingOverlay.style.display === "block") {
-    closeTrending();
-  }
-});
-
-
-
-  // Populate Top Rated
+function populateTopRated() {
   const topRatedCarousel = document.getElementById("topRatedCarousel");
+  if (!topRatedCarousel) return;
   topRatedCarousel.innerHTML = "";
-  const topRated = [...movies].sort((a,b)=> (b.rating||0) - (a.rating||0)).slice(0,20);
+  const topRated = [...movies].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 20);
   topRated.forEach(m => {
     const card = document.createElement("div");
     card.className = "card";
@@ -2256,424 +2217,119 @@ document.addEventListener("keydown", e => {
       <div class="title">${m.title}</div>
       <div class="rating">⭐ ${m.rating ? m.rating.toFixed(1) : "N/A"}</div>
     `;
-    card.onclick = () => protectedAction("watch", movies.findIndex(x=>x.id===m.id));
+    card.onclick = () => protectedAction("watch", movies.findIndex(x => x.id === m.id));
     topRatedCarousel.appendChild(card);
   });
-});
-document.querySelectorAll(".arrow").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const targetId = btn.dataset.target;
-    const carousel = document.getElementById(targetId);
-    const scrollAmount = 300; // adjust to card width
-
-    if (btn.classList.contains("left")) {
-      carousel.scrollBy({ left: -scrollAmount, behavior: "smooth" });
-    } else {
-      carousel.scrollBy({ left: scrollAmount, behavior: "smooth" });
-    }
-  });
-});
-
-const trendingSection = document.getElementById("trendingSection");
-const topRatedSection = document.getElementById("topRatedSection");
-
-document.getElementById("toggleTrending").onclick = () => {
-  trendingSection.classList.toggle("show");
-};
-
-document.getElementById("toggleTopRated").onclick = () => {
-  topRatedSection.classList.toggle("show");
-};
-
-
-/* Filters */
-function populateFilters() {
-  const genreSet = new Set(), yearSet = new Set();
-  movies.forEach(m => { if(m.genres) m.genres.forEach(g=>genreSet.add(g)); yearSet.add(m.year); });
-  genreFilter.innerHTML = '<option value="">All genres</option>';
-  yearFilter.innerHTML = '<option value="">All years</option>';
-  genreSet.forEach(g=>genreFilter.innerHTML+=`<option value="${g}">${g}</option>`);
-  Array.from(yearSet).sort((a,b)=>b-a).forEach(y=>yearFilter.innerHTML+=`<option value="${y}">${y}</option>`);
 }
 
-/* ================= NOTIFICATION SYSTEM ================= */
-
-let notifTimer = null;
-
-function showNotification(htmlContent, duration = 10000) {
-  const modal = document.getElementById("notificationModal");
-  const text  = document.getElementById("notificationText");
-
-  if (!modal || !text) return;
-
-  /* 🔽 ADDED: scrolling feature with hidden scrollbar (NO logic change) */
-text.style.maxHeight = "320px";
-text.style.overflowY = "auto";
-text.style.paddingRight = "3px";
-text.style.scrollbarWidth = "none";        // Firefox
-text.style.msOverflowStyle = "none";       // IE 10+
-text.style.boxSizing = "border-box";
-
-/* hide scrollbar for WebKit browsers (Chrome, Safari, Edge) */
-text.style.setProperty("overflow", "overlay"); // optional smooth scrolling
-text.style.setProperty("scrollbar-width", "none");
-text.style.setProperty("-ms-overflow-style", "none");
-text.style.setProperty("-webkit-overflow-scrolling", "touch");
-text.style.setProperty("--hide-scrollbar", "none");
-
-text.classList.add("hide-scrollbar");
-/* 🔼 END ADDITION */
-
-
-  text.innerHTML = htmlContent; // allow rich HTML
-
-  modal.style.display = "block";
-
-  if (notifTimer) clearTimeout(notifTimer);
-  notifTimer = setTimeout(() => {
-    modal.style.display = "none";
-  }, duration);
-}
-
-document.addEventListener("click", e => {
-  if (e.target.classList.contains("close-notif")) {
-    document.getElementById("notificationModal").style.display = "none";
-    if (notifTimer) clearTimeout(notifTimer);
-  }
-});
-
-/* ================= RENDER MOVIES ================= */
-
+/* ---------------- Render & Filters ---------------- */
 function renderMovies() {
   const grid = document.getElementById("grid");
   const searchText = document.getElementById("search").value.toLowerCase();
   const selectedGenre = genreFilter.value;
   const selectedYear = yearFilter.value;
-  const selectedType = document.getElementById("typeFilter").value;
+  const typeFilterEl = document.getElementById("typeFilter");
+  const selectedType = typeFilterEl ? typeFilterEl.value : "";
 
   grid.innerHTML = "";
 
   const filtered = movies.filter(m => {
     const matchesSearch = (m.title || "").toLowerCase().includes(searchText);
     const matchesGenre = !selectedGenre || (m.genres && m.genres.includes(selectedGenre));
-    const matchesYear  = !selectedYear || m.year == selectedYear;
-    const matchesType  = !selectedType || m.type === selectedType || !m.type;
+    const matchesYear = !selectedYear || m.year == selectedYear;
+    const matchesType = !selectedType || m.type === selectedType || (!m.type && selectedType === "Movie");
     return matchesSearch && matchesGenre && matchesYear && matchesType;
   });
 
+  window.currentFiltered = filtered;
   const now = Date.now();
 
-  /* ===== COLLECT NOTIFICATIONS ===== */
-  const newMovies   = [];
-  const newEpisodes = [];
-
   filtered.forEach((m, index) => {
-
     let badgesHTML = "";
     let topRightHTML = "";
     let progressHTML = "";
     let continueHTML = "";
 
-    /* -------- NEW MOVIE -------- */
     if (m.type !== "Series" && now - (m.createdAt || 0) < 86400000) {
-      badgesHTML += `<div class="movie-glow-badge fade-out-24h">NEW MOVIE</div>`;
-      newMovies.push({ title: m.title, poster: m.poster });
+      badgesHTML += `<div class="movie-glow-badge">NEW MOVIE</div>`;
     }
 
-    /* -------- HOT -------- */
-    if (m.views && m.views >= 1000) {
-      badgesHTML += `<div class="hot-badge">HOT</div>`;
-    }
-
-    /* -------- TYPE LABEL (RIGHT SIDE) -------- */
-    const typeLabel =
-      m.type === "Series" ? "SERIES" :
-      m.type === "Animation" ? "ANIMATION" :
-      "MOVIE";
-
-    topRightHTML += `<div class="type-badge">${typeLabel}</div>`;
-
-    /* -------- STATUS (ONGOING / COMPLETE) -------- */
-    if (m.type === "Series") {
-      const isComplete = m.completed === true;
-      topRightHTML += `
-        <div class="status-badge ${isComplete ? "complete" : "ongoing"}">
-          ${isComplete ? "COMPLETE" : "ONGOING"}
-        </div>
-      `;
-    }
-
-    /* -------- SERIES EPISODES -------- */
-    if (m.type === "Series" && m.episodes?.length) {
-      const latest = m.episodes[m.episodes.length - 1];
-      const isFresh = now - (latest.createdAt || now) < 86400000;
-      const ep = latest.ep || 0;
-
-      if (isFresh && !hasWatched(m.id, ep)) {
-        badgesHTML += `
-          <div class="new-badge fade-out-24h">
-            NEW EPISODE
-          </div>
-        `;
-        newEpisodes.push({ title: m.title, poster: m.poster });
-      }
-
-      /* -------- EPISODE PROGRESS BAR -------- */
-      const watchedCount = getWatchedEpisodes(m.id) || 0;
-      const totalEpisodes = m.episodes.length;
-      const progress = Math.min((watchedCount / totalEpisodes) * 100, 100);
-
-      progressHTML = `
-        <div class="episode-progress">
-          <div class="episode-progress-bar" style="width:${progress}%"></div>
-        </div>
-      `;
-
-      /* -------- CONTINUE WATCHING -------- */
-      if (watchedCount > 0 && watchedCount < totalEpisodes) {
-        continueHTML = `<div class="continue-ribbon">🔥 Continue Watching</div>`;
-      }
-    }
-
-    const ratingText = m.rating
-      ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating * 10)}%)`
-      : "";
+    const typeLabel = m.type || "MOVIE";
+    topRightHTML += `<div class="type-badge">${typeLabel.toUpperCase()}</div>`;
 
     const card = document.createElement("div");
     card.className = "card";
-
     card.innerHTML = `
-      <div class="poster-wrapper" style="position:relative;">
-        ${continueHTML}
+      <div class="poster-wrapper">
         <div class="badges-container">${badgesHTML}</div>
-
-        <div class="top-right-info">
-          ${topRightHTML}
-        </div>
-
-        <img class="poster" src="${m.poster || ""}">
-
-        <div class="compare-circle"
-             onclick="selectSecondMovie(${index})"
-             title="Select for comparison"
-              style="
-  display: none;
-  position: absolute;
-  top:12%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 2px solid #00ff66;
-  background: rgba(0, 255, 102, 0.2);
-  cursor: pointer;
-  z-index: 5;
-  transition: all 0.3s ease;
-"
-        </div>
+        <div class="top-right-info">${topRightHTML}</div>
+        <img class="poster" src="${m.poster || ""}" onclick="protectedAction('watch', ${index})">
       </div>
-
       <div class="card-body">
-        <h3 class="movie-title">${(m.title || '').replace(/</g,'&lt;')}</h3>
-        <div class="meta">${m.year || ''} · ${(m.genres || []).join(", ")}</div>
-        <div class="rating">${ratingText}</div>
-
-        ${progressHTML}
-
+        <h3 class="movie-title">${m.title}</h3>
+        <div class="meta">${m.year} · ${(m.genres || []).join(", ")}</div>
         <div class="card-actions">
-
-          <button class="btn-icon" title="Details" onclick="protectedAction('details', ${index})">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10
-                       10-4.48 10-10S17.52 2 12 2zm0 3c.83 0 1.5.67
-                       1.5 1.5S12.83 8 12 8s-1.5-.67-1.5-1.5S11.17 5 12 5zm2 12h-4v-2h1v-4h-1v-2h3v6h1v2z"/>
-            </svg>
-          </button>
-
-          <button class="btn-icon" title="Add to Watchlist"
-            onclick="event.stopPropagation(); protectedAction('add', ${index})">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
-              <path d="M19 3H5c-1.1 0-2 .9-2 2v14l8-3 8 3V5
-                       c0-1.1-.9-2-2-2zM12 10v4h-2v-4H8v-2h2V6h2v2h2v2h-2z"/>
-            </svg>
-          </button>
-
-          <button class="btn-icon" title="Watch Movie" onclick="protectedAction('watch', ${index})">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
-              <path d="M10 8.64L15.27 12 10 15.36V8.64M12 2C6.5 2 
-                       2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/>
-            </svg>
-          </button>
-
-          <button class="btn-icon" title="Compare"
-            onclick="event.stopPropagation(); openCompare(${index})">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#00ff66" viewBox="0 0 24 24">
-              <path d="M10 3H5v18h5V3zm9 6h-5v12h5V9z"/>
-            </svg>
-          </button>
-
+           <button class="btn-icon" onclick="protectedAction('details', ${index})">ℹ️</button>
+           <button class="btn-icon" onclick="protectedAction('add', ${index})">🔖</button>
+           <button class="btn-icon" onclick="protectedAction('watch', ${index})">▶️</button>
         </div>
       </div>
     `;
-
-    card.querySelector(".poster").onclick = () =>
-      protectedAction("watch", index);
-
     grid.appendChild(card);
   });
-
-  window.currentFiltered = filtered;
-
-
-  /* ===== SHOW GROUPED NOTIFICATION WITH POSTERS ===== */
-  if (newMovies.length || newEpisodes.length) {
-
-    let html = `
-      <h3 style="margin-bottom:10px;">New Uploads Added</h3>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-    `;
-
-    newMovies.forEach(m => {
-      html += `
-        <div style="display:flex;gap:10px;align-items:center;">
-          <img src="${m.poster || ''}"
-               style="width:45px;height:65px;object-fit:cover;border-radius:6px;">
-          <div>
-            <strong>${m.title}</strong><br>
-            <small>Movie</small>
-          </div>
-        </div>
-      `;
-    });
-
-    newEpisodes.forEach(e => {
-      html += `
-        <div style="display:flex;gap:10px;align-items:center;">
-          <img src="${e.poster || ''}"
-               style="width:45px;height:65px;object-fit:cover;border-radius:6px;">
-          <div>
-            <strong>${e.title}</strong><br>
-            <small>Episode S${e.season}E${e.ep}</small>
-          </div>
-        </div>
-      `;
-    });
-
-    html += `</div>`;
-
-    showNotification(html, 80000);
-  }
 }
 
-/* ================= PROTECTED ACTION ================= */
+/* ---------------- Auth & Device Management ---------------- */
+async function loginUser(identifier, password) {
+  const usersRef = collection(db, "users");
+  let q = query(usersRef, where("email", "==", identifier.toLowerCase()));
+  let snapshot = await getDocs(q);
 
-window.protectedAction = function(action, index) {
-
-  if (!currentUser) {
-    showGuestModal(action);
-    return;
+  if (snapshot.empty) {
+    q = query(usersRef, where("username", "==", identifier));
+    snapshot = await getDocs(q);
   }
 
-  if (currentUser.status !== "Paid") {
-    alert("⚠ Your account is unpaid. Please contact support.");
-    return;
+  if (snapshot.empty) return alert("❌ User not found");
+
+  const userDoc = snapshot.docs[0];
+  const user = { id: userDoc.id, ...userDoc.data() };
+
+  if (user.password !== password) return alert("❌ Incorrect password");
+
+  // Device Limit Logic
+  const deviceId = getDeviceId();
+  let active = user.activeDevices || [];
+  if (!active.includes(deviceId)) {
+    if (active.length >= (user.devicesAllowed || 1)) {
+       return alert("🚫 Device limit reached.");
+    }
+    active.push(deviceId);
+    await updateDoc(doc(db, "users", user.id), { activeDevices: active });
   }
 
-  if (action === "details") return viewDetailsByFiltered(index);
-  if (action === "watch")   return viewAndPlayByFiltered(index);
-
-  if (action === "add") {
-    const movie = currentFiltered[index];
-    addToWatchlistByFiltered(index);
-
-    showNotification(`
-      <div style="display:flex;gap:10px;align-items:center;">
-        <img src="${movie.poster || ''}"
-             style="width:45px;height:65px;object-fit:cover;border-radius:6px;">
-        <div>
-          <strong>${movie.title}</strong><br>
-          <small>Added to watchlist</small>
-        </div>
-      </div>
-    `);
-  }
-};
-
-/* ---------------- Guest modal ---------------- */
-function showGuestModal(actionHint='') {
-  const now = new Date();
-  const h = now.getHours();
-  let greet = 'Hello';
-
-  if (h < 12) greet = 'Good morning';
-  else if (h < 18) greet = 'Good afternoon';
-  else greet = 'Good evening';
-
-  guestGreeting.innerText = `${greet}, Guest! 🎄`;
-
-  // 📅 Date logic
-  const month = now.getMonth(); // 11 = December
-  const day = now.getDate();
-  const isChristmas = (month === 11 && day <= 26);
-
-  // 🎄 Christmas messages (rotates daily)
-  const christmasMessages = [
-    "🎄 Merry Christmas & Happy Holidays!",
-    "🎁 Season’s Greetings! Enjoy festive entertainment.",
-    "✨ Celebrate Christmas with unlimited HD movies!"
-  ];
-
-  // 🎆 New Year messages (rotates daily)
-  const newYearMessages = [
-    "🎆 Happy New Year! Start the year with premium movies.",
-    "🥂 Cheers to a New Year of non-stop entertainment!",
-    "🎉 New Year Special — Stream & download anytime!"
-  ];
-
-  // 🔁 Daily rotation using date
-  const messageIndex = day % 3;
-  const selectedMessage = isChristmas
-    ? christmasMessages[messageIndex]
-    : newYearMessages[messageIndex];
-
-  guestMessage.innerHTML = `
-    <strong>${selectedMessage}</strong><br><br>
-    You're browsing in <strong>Guest mode</strong>.  
-    Unlock <strong>Premium Access</strong> for full HD movies, smooth streaming, and unlimited downloads.<br><br>
-    To use ${actionHint ? `<strong>${actionHint}</strong>` : 'premium features'}, please subscribe.<br><br>
-    ${isChristmas ? '🎁 <strong>Christmas Special:</strong>' : '🎆 <strong>New Year Offer:</strong>'}
-    <strong>150 KSh / month</strong><br>
-    Contact our team and enjoy unlimited entertainment!
-  `;
-
-  const phone = '+254790427109';
-  waLink.href = `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(
-    isChristmas
-      ? 'Hi, I want a MovieDrift premium account. Merry Christmas!'
-      : 'Hi, I want a MovieDrift premium account. Happy New Year!'
-  )}`;
-  callLink.href = `tel:${phone}`;
-
-  const modal = document.getElementById('guestModal');
-  modal.style.display = 'flex';
-
-  // ❄ Snowfall only during Christmas
-  if (isChristmas) {
-    startModalSnowfall(modal, 25);
-  }
-
-  guestLoginBtn.onclick = () => {
-    closeModal('guestModal');
-    openAuthModal();
-  };
+  currentUser = user;
+  saveCurrentUser();
+  updateAuthUI();
+  closeModal('authModal');
+  alert(`Welcome back, ${user.username || user.email}!`);
 }
 
-/* =======================================================
-   👤 USER LOGIN + DEVICE LIMIT + SUBSCRIPTION CHECK
-   ======================================================= */
+async function registerUser(identifier, password) {
+  if (password.length < 6) return alert("Password too short");
+  const usersRef = collection(db, "users");
+  await addDoc(usersRef, {
+    email: identifier.toLowerCase(),
+    password: password,
+    status: "Pending",
+    createdAt: Date.now(),
+    activeDevices: [],
+    devicesAllowed: 1
+  });
+  alert("✅ Account created! Awaiting admin approval.");
+  closeModal('authModal');
+}
 
-/* ---------------- DEVICE ID ---------------- */
 function getDeviceId() {
   let id = localStorage.getItem("deviceId");
   if (!id) {
@@ -2682,1980 +2338,77 @@ function getDeviceId() {
   }
   return id;
 }
-const deviceId = getDeviceId();
 
-/* ---------------- ENFORCE DEVICE LIMIT ---------------- */
-async function enforceDeviceLimit(user, allowForceLogout = false) {
-  const snap = await getDoc(doc(db, "users", user.id));
-  const latestUser = snap.data();
-  const allowed = latestUser.devicesAllowed || 1;
-
-  let active = (latestUser.activeDevices || []).filter(d => typeof d === "string" && d.trim() !== "");
-
-  if (active.includes(deviceId)) return;
-
-  if (active.length >= allowed) {
-    if (allowForceLogout) {
-      const updatedDevices = active.slice(1);
-      await updateDoc(doc(db, "users", user.id), { activeDevices: [...updatedDevices, deviceId] });
-      return;
-    } else {
-      throw new Error("🚫 Device limit exceeded. Please upgrade for more devices.");
-    }
+/* ---------------- Helper Functions ---------------- */
+window.protectedAction = function(action, index) {
+  if (!currentUser) {
+    showGuestModal(action);
+    return;
   }
+  if (currentUser.status !== "Paid") {
+    alert("⚠ Please complete payment to access this feature.");
+    return;
+  }
+  const movie = window.currentFiltered[index];
+  if (action === 'add') addToWatchlist(movie);
+  if (action === 'watch') playMovie(movie);
+  if (action === 'details') showDetails(movie);
+};
 
-  active.push(deviceId);
-  await updateDoc(doc(db, "users", user.id), { activeDevices: active });
+function addToWatchlist(movie) {
+  if (!watchlist.some(m => m.id === movie.id)) {
+    watchlist.push(movie);
+    localStorage.setItem("watchlist", JSON.stringify(watchlist));
+    updateWatchlistCount();
+    alert("Added to watchlist");
+  }
 }
 
-/* ---------------- LOGIN FUNCTION ---------------- */
-async function loginUser(identifier, password) {
-  const usersRef = collection(db, "users");
-
-  // Query by email first
-  let q = query(usersRef, where("email", "==", identifier));
-  let snapshot = await getDocs(q);
-
-  if (snapshot.empty) {
-    // Then query by username
-    q = query(usersRef, where("username", "==", identifier));
-    snapshot = await getDocs(q);
-    if (snapshot.empty) return alert("❌ User not found");
-  }
-
-  const userDoc = snapshot.docs[0];
-  const user = { id: userDoc.id, ...userDoc.data() };
-
-  // Check password
-  if (user.password !== password) return alert("❌ Incorrect password");
-
-  // Check account status
-  if (user.status === "Pending") {
-    return alert(
-      "⏳ Your account is pending payment.\n" +
-      "Please make payment via M-Pesa Paybill 400200 ACC 1128286.\n" +
-      "Admin will activate your account once payment is confirmed."
-    );
-  }
-
-  if (user.status === "Unpaid") {
-    return alert(
-      "❌ Your account is inactive or expired.\n" +
-      "Please contact our team to reactivate it."
-    );
-  }
-
-  // Auto-expire subscription if past expiry
-  if (user.subscriptionExpiresAt && Date.now() >= user.subscriptionExpiresAt && user.status === "Paid") {
-    await updateDoc(doc(db, "users", user.id), { status: "Unpaid", activeDevices: [] });
-    return alert(
-      "❌ Your subscription has expired.\n" +
-      "Please contact our team to reactivate your account."
-    );
-  }
-
-  // Enforce device limit
-  try {
-    await enforceDeviceLimit(user);
-  } catch (err) {
-    return alert(err.message);
-  }
-
-  // Login successful
-  currentUser = user;
-  saveCurrentUser();
-  watchUserStatus();
-
-  alert(`✅ Logged in successfully as ${user.username}`);
-  updateAuthUI();
-  closeModal('authModal');
+function updateWatchlistCount() {
+  const btn = document.getElementById("watchlistToggle");
+  if (btn) btn.innerText = `Watchlist (${watchlist.length})`;
 }
 
-/* ---------------- LOGOUT CURRENT DEVICE ---------------- */
-async function logoutCurrentDevice() {
-  if (!currentUser) return;
-  const snap = await getDoc(doc(db, "users", currentUser.id));
-  const user = snap.data();
-  const updated = (user.activeDevices || []).filter(d => d !== deviceId);
-  await updateDoc(doc(db, "users", currentUser.id), { activeDevices: updated });
-  currentUser = null;
-  clearCurrentUser();
-  updateAuthUI();
+function populateFilters() {
+  const genreSet = new Set(), yearSet = new Set();
+  movies.forEach(m => { 
+    if (m.genres) m.genres.forEach(g => genreSet.add(g)); 
+    yearSet.add(m.year); 
+  });
+  genreFilter.innerHTML = '<option value="">All genres</option>';
+  yearFilter.innerHTML = '<option value="">All years</option>';
+  genreSet.forEach(g => genreFilter.innerHTML += `<option value="${g}">${g}</option>`);
+  Array.from(yearSet).sort((a, b) => b - a).forEach(y => yearFilter.innerHTML += `<option value="${y}">${y}</option>`);
 }
 
-/* ---------------- LOGOUT OTHER DEVICES ---------------- */
-async function logoutOtherDevices() {
-  if (!currentUser) return;
-  await updateDoc(doc(db, "users", currentUser.id), { activeDevices: [deviceId] });
-  alert("✅ Other devices logged out. You can now log in on this device.");
-}
-
-/* ---------------- CAN PLAY VIDEO ---------------- */
-async function canPlayVideo(userId) {
-  const snap = await getDoc(doc(db, "users", userId));
-  const user = snap.data();
-  const allowed = user.devicesAllowed || 1;
-  let active = user.activeDevices || [];
-
-  if (!active.includes(deviceId)) {
-    if (active.length >= allowed) {
-      alert("🚫 Device limit reached. Cannot play video. Upgrade subscription or logout from other devices.");
-      return false;
-    }
-    active.push(deviceId);
-    await updateDoc(doc(db, "users", userId), { activeDevices: active });
+function updateAuthUI() {
+  if (currentUser) {
+    openAuthBtn.style.display = 'none';
+    logoutBtn.style.display = 'inline-block';
+  } else {
+    openAuthBtn.style.display = 'inline-block';
+    logoutBtn.style.display = 'none';
   }
-
-  return true;
 }
 
-/* ---------------- BUTTONS ---------------- */
-signInBtn.onclick = () => loginUser(authIdentifier.value.trim(), authPassword.value);
-registerBtn.onclick = () => registerUser(authIdentifier.value.trim(), authPassword.value);
-openAuthBtn.onclick = () => openAuthModal();
-guestLoginBtn.onclick = () => openAuthModal();
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+}
+
+/* ---------------- Event Listeners ---------------- */
+signInBtn.onclick = () => loginUser(authIdentifier.value, authPassword.value);
+registerBtn.onclick = () => registerUser(authIdentifier.value, authPassword.value);
 logoutBtn.onclick = () => { currentUser = null; saveCurrentUser(); updateAuthUI(); };
-async function registerUser(identifier, password) {
-  identifier = identifier.trim().toLowerCase();
+openAuthBtn.onclick = () => authModal.style.display = 'flex';
+toggleTrendingBtn.onclick = openTrending;
+trendingOverlay.onclick = closeTrending;
 
-  if (password.length < 6) {
-    alert("Password must be 6+ characters");
-    return;
-  }
-
-  const usersRef = collection(db, "users");
-  const q = query(usersRef, where("email", "==", identifier));
-  const snapshot = await getDocs(q);
-
-  if (!snapshot.empty) {
-    alert("User already exists");
-    return;
-  }
-
-  // Create user as PENDING (not approved yet)
-  await addDoc(usersRef, {
-    email: identifier,
-    password: password,
-    createdAt: Date.now(),
-    status: "Pending"
-  });
-
-  alert(
-    "✅ Account created successfully!\n\n" +
-    "⚠️ Your account is pending approval.\n\n" +
-    "Please make payment via M-Pesa to:\n" +
-    "Mpesa- Paybill 400200 ACC 1128286\n\n" +
-    "After payment, wait for admin approval before logging in you can also call for confirmation 0747436668."
-  );
-
-  // Do NOT log in user yet
-  closeModal("authModal");
-}
-
-/* Modals */
-function openAuthModal(){authModal.style.display='flex';}
-function closeModal(id){document.getElementById(id).style.display='none'; if(episodeUnsub) episodeUnsub();}
-document.querySelectorAll('.modal .close').forEach(btn=>{ btn.onclick = ()=>btn.closest('.modal').style.display='none'; });
-
-/* Update UI */
-function updateAuthUI(){
-  if(currentUser){ openAuthBtn.style.display='none'; logoutBtn.style.display='inline-block'; }
-  else{ openAuthBtn.style.display='inline-block'; logoutBtn.style.display='none'; }
-}
-
-/* Watchlist */
-function updateWatchlistCount(){
-  document.getElementById("watchlistToggle").innerText=`Watchlist (${watchlist.length})`;
-}
-function addToWatchlistByFiltered(index){
-  const movie=currentFiltered[index];
-  if(!watchlist.some(m=>m.id===movie.id)) watchlist.push(movie);
-  localStorage.setItem("watchlist",JSON.stringify(watchlist));
-  updateWatchlistCount();
-  alert(`${movie.title} added to Watchlist`);
-}
-document.getElementById("watchlistToggle").onclick=()=>{ renderWatchlist(); document.getElementById("watchlistModal").style.display='flex'; };
-function renderWatchlist(){
-  const container=document.getElementById("watchlistContainer");
-  container.innerHTML="";
-  watchlist.forEach((m,i)=>{
-    const card=document.createElement("div");
-    card.className="watchlist-card";
-    card.innerHTML=`<img src="${m.poster||''}"><div>${m.title}</div><button class="remove-btn" onclick="removeFromWatchlist(${i})">Remove</button>`;
-    container.appendChild(card);
-  });
-}
-window.removeFromWatchlist=function(i){watchlist.splice(i,1);localStorage.setItem("watchlist",JSON.stringify(watchlist));updateWatchlistCount();renderWatchlist();}
-
-/* Search & filters */
-const searchInput = document.getElementById("search");
-const trailerSection = document.getElementById("trailerShowcase"); // trailer container
-const posterSection = document.getElementById("posterShowcase");   // poster container
-const upcomingSection = document.getElementById("upcomingSection"); // ✅ upcoming releases
-
-function handleSearchAndFilter() {
-  renderMovies(); // your existing render
-
-  // Hide sections if search or filters have a value
-  const hasSearch = searchInput.value.trim().length > 0;
-  const hasGenre = genreFilter.value !== "";
-  const hasYear = yearFilter.value !== "";
-  const hasType = document.getElementById("typeFilter").value !== "";
-
-  const shouldHide = hasSearch || hasGenre || hasYear || hasType;
-
-  trailerSection.style.display = shouldHide ? "none" : "block";
-  posterSection.style.display = shouldHide ? "none" : "block";
-  upcomingSection.style.display = shouldHide ? "none" : "block"; // ✅ added
-}
-
-// Attach to search and filters
-searchInput.oninput = handleSearchAndFilter;
-genreFilter.onchange = handleSearchAndFilter;
-yearFilter.onchange = handleSearchAndFilter;
-document.getElementById("typeFilter").onchange = handleSearchAndFilter;
-
-/* ---------------- THEME SYSTEM (Script2) ---------------- */
-const themeSelector = document.getElementById("themeSelector");
-
-// Load saved theme (fallback to dark)
-const savedTheme = localStorage.getItem("theme") || "dark";
-
-// Apply saved theme
-document.body.classList.add("theme-" + savedTheme);
-
-// Update selector UI
-if (themeSelector) {
-  themeSelector.value = savedTheme;
-
-  themeSelector.onchange = () => {
-    const theme = themeSelector.value;
-
-    // Remove all possible theme classes
-    ["theme-dark","theme-white","theme-pink","theme-blue","theme-gold","theme-purple"]
-      .forEach(c => document.body.classList.remove(c));
-
-    // Add new theme
-    document.body.classList.add("theme-" + theme);
-
-    // Save theme
-    localStorage.setItem("theme", theme);
-  };
-}
-/* ---------------- ADD-ON: SECTIONS MATCH ORIGINAL THEME COLORS ---------------- */
-function applyThemeToSections(theme) {
-  const themeColors = {
-    dark:   { bg: "#000", cardBg: "#0a0a0a", accent: "#00ff6" },
-    white:  { bg: "#fff", cardBg: "#f9f9f9", accent: "#00aa66" },
-    pink:   { bg: "#fdf2f6", cardBg: "#2b0b2b", accent: "#ff66aa" },
-    blue:   { bg: "#0a0a1a", cardBg: "#0b0b2b", accent: "#3399ff" },
-    gold:   { bg: "#1a1400", cardBg: "#2b2200", accent: "#ffcc00" },
-    purple: { bg: "#0a001a", cardBg: "#1a002b", accent: "#cc66ff" }
-  };
-
-  const colors = themeColors[theme] || themeColors.dark;
-
-  // Update section backgrounds
-  ["posterShowcase", "trailerShowcase", "upcomingSection"].forEach(id => {
-    const section = document.getElementById(id);
-    if (section) section.style.backgroundColor = colors.bg;
-  });
-
-  // Update cards and buttons
-  document.querySelectorAll(".poster-card, .trailer-btn, .upcoming-card").forEach(el => {
-    el.style.backgroundColor = colors.cardBg;
-    el.style.color = colors.accent;
-  });
-
-  // Update Upcoming Releases title
-  document.querySelectorAll("#upcomingSection h2").forEach(h => {
-    h.style.color = colors.accent;
-  });
-}
-
-// Apply theme on page load
-applyThemeToSections(localStorage.getItem("theme") || "dark");
-
-// Hook into existing theme selector onchange
-if (themeSelector) {
-  const originalOnChange = themeSelector.onchange;
-  themeSelector.onchange = () => {
-    if (originalOnChange) originalOnChange(); // call existing handler
-    applyThemeToSections(themeSelector.value); // update sections
-  };
-}
-
-/* Page init */
+// Init
 loadCurrentUser();
 updateAuthUI();
 updateWatchlistCount();
-
-/* ---------------- MODAL & YOUTUBE ---------------- */
-function isIOS() {
-  return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-}
-
-function isIOSPlayable(url) {
-  return /\.(mp4|mov)$/i.test(url);
-}
-
-function isDownloadable(url) {
-  return /\.(mp4|mkv|mov|wmv|avi|flv|webm)$/i.test(url);
-}
-
-/* =========================================================
-   MODAL & YOUTUBE
-========================================================= */
-function convertYouTubeLink(url) {
-  try {
-    if (url.includes("youtube.com/watch?v="))
-      return `https://www.youtube.com/embed/${url.split("v=")[1].split("&")[0]}?rel=0`;
-    if (url.includes("youtu.be/"))
-      return `https://www.youtube.com/embed/${url.split("youtu.be/")[1].split("?")[0]}?rel=0`;
-    return url;
-  } catch { return url; }
-}
- 
-/* ---------------- Episodes fetching ---------------- */
-let episodeUnsub = null;
-let currentEpisodeList = [];
-let currentEpisodeIndex = 0;
-let playbackPositions = {}; // Stores time per episode
-
-// Load saved playback positions from localStorage
-if (localStorage.getItem("playbackPositions")) {
-  try { playbackPositions = JSON.parse(localStorage.getItem("playbackPositions")); } 
-  catch { playbackPositions = {}; }
-}
-
-// ---------------- Episode Notifications System ----------------
-let episodeUnsubscriptions = {}; // store unsub functions per series
-
-/* Toast container */
-const toastContainer = document.createElement("div");
-toastContainer.id = "toastContainer";
-toastContainer.style = `
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 400px;
-`;
-document.body.appendChild(toastContainer);
-
-const style = document.createElement("style");
-style.innerHTML = `
-#toastContainer { max-height: 70vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #00ff66 #111; padding-right: 4px; }
-#toastContainer::-webkit-scrollbar { width:6px; }
-#toastContainer::-webkit-scrollbar-track { background:#111; }
-#toastContainer::-webkit-scrollbar-thumb { background:#00ff66; border-radius:10px; }
-.close-all-btn { position: sticky; top:0; z-index:3; background: linear-gradient(90deg,#ff4444,#ff0000); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:bold; cursor:pointer; margin-bottom:6px; }
-.close-all-btn:hover { opacity:0.85; }
-.professional-toast { background: linear-gradient(90deg,#1f1f1f,#333); color:#00ff66; padding:12px 20px; border-radius:10px; box-shadow:0 5px 20px rgba(0,0,0,0.4); font-family:'Segoe UI',sans-serif; font-weight:bold; min-width:250px; cursor:pointer; position:relative; display:flex; flex-direction:column; gap:5px; word-break:break-word; animation:slideIn 0.4s ease; }
-.professional-toast:hover { background:linear-gradient(90deg,#222,#444); }
-.professional-toast .toast-title { font-size:14px; font-weight:bold; }
-.professional-toast .toast-episode { font-size:13px; }
-.professional-toast .close-btn { position:absolute; top:5px; right:8px; cursor:pointer; color:#fff; font-weight:bold; font-size:14px; }
-@keyframes slideIn { from { transform:translateX(120%); opacity:0; } to { transform:translateX(0); opacity:1; } }
-/* Resume toast */
-.resume-toast { background:#111;color:#00ff66;padding:10px 14px;border-radius:8px;font-weight:bold;cursor:pointer;border:1px solid #00ff66; }
-.resume-toast:hover { background:#222; }
-`;
-document.head.appendChild(style);
-
-// Global Close All button
-const closeAllBtn = document.createElement("button");
-closeAllBtn.innerText = "× Close All";
-closeAllBtn.style = `
-  background: #ff4444;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-weight: bold;
-  cursor: pointer;
-  margin-bottom: 5px;
-  display: none;
-`;
-closeAllBtn.addEventListener("click", () => {
-  const allToasts = toastContainer.querySelectorAll(".professional-toast, .resume-toast");
-  allToasts.forEach(t => t.remove());
-  closeAllBtn.style.display = "none";
-});
-toastContainer.appendChild(closeAllBtn);
-
-/* ---------------- Episode Notification (once per episode, multiple allowed) ---------------- */
-function showEpisodeNotification(seriesTitle, episodeId, episodeNumber) {
-  const notified = JSON.parse(localStorage.getItem("notifiedEpisodes") || "{}");
-
-  // Prevent duplicate notifications per episode
-  if (notified[episodeId]) return;
-
-  // Mark as notified
-  notified[episodeId] = true;
-  localStorage.setItem("notifiedEpisodes", JSON.stringify(notified));
-
-  // Create toast
-  const toast = document.createElement("div");
-  toast.className = "professional-toast";
-  toast.innerHTML = `
-    <span class="toast-title">${seriesTitle}</span>
-    <span class="toast-episode">Episode ${episodeNumber} Added</span>
-    <span class="close-btn">&times;</span>
-  `;
-
-  toastContainer.appendChild(toast);
-
-  // Close button handler
-  toast.querySelector(".close-btn").addEventListener("click", () => {
-    toast.remove();
-  });
-
-  // Auto-remove after 15 seconds
-  setTimeout(() => {
-    if (toast.isConnected) toast.remove();
-  }, 15000);
-}
-
-/* Show Resume Notification */
-function showResumeToast(ep, index) {
-  const toast = document.createElement("div");
-  toast.className = "resume-toast";
-  const time = playbackPositions[ep.id] ? formatTime(playbackPositions[ep.id]) : "0:00";
-  toast.innerHTML = `You left off Episode ${ep.epNumber || ep.ep || index+1} at ${time}. Click to resume`;
-  toastContainer.appendChild(toast);
-
-  toast.addEventListener("click", () => {
-    playEpisode(index);
-    toast.remove();
-  });
-
-  setTimeout(() => { toast.remove(); }, 15000);
-}
-
-// format seconds to mm:ss
-function formatTime(sec) {
-  const m = Math.floor(sec/60);
-  const s = Math.floor(sec%60);
-  return `${m}:${s.toString().padStart(2,'0')}`;
-}
-
-/* ---------------- Watch for new episodes ---------------- */
-function watchEpisodesNotifications(movieId, seriesTitle) {
-  const episodesColl = collection(db, "movies", movieId, "episodes");
-  const q = query(episodesColl);
-  let knownEpisodes = new Set();
-  return onSnapshot(q, snapshot => {
-    snapshot.docChanges().forEach(change => {
-      if (change.type === "added") {
-        const episode = { id: change.doc.id, ...change.doc.data() };
-        const epNumber = episode.epNumber || episode.ep || "";
-        if (!knownEpisodes.has(episode.id)) {
-          knownEpisodes.add(episode.id);
-          showEpisodeNotification(seriesTitle, episode.id, epNumber);
-        }
-      }
-    });
-  });
-}
-
-/* Fetch episodes */
-async function fetchEpisodesForMovie(movieId) {
-  const episodesColl = collection(db, "movies", movieId, "episodes");
-  const snapshot = await getDocs(episodesColl);
-  return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-}
-
-/* ---------------- WATCH EPISODES & BUTTONS ---------------- */
-function watchEpisodes(movieId) {
-  const episodesColl = collection(db,"movies",movieId,"episodes");
-  const q = query(episodesColl);
-  return onSnapshot(q, snapshot => {
-    let episodes = snapshot.docs.map(d => ({ id:d.id,...d.data() }));
-    episodes.sort((a,b)=>{ const sA=a.season||1,sB=b.season||1,eA=a.epNumber||a.ep||1,eB=b.epNumber||b.ep||1; return sA!==sB?sA-sB:eA-eB; });
-
-    currentEpisodeList = episodes;
-    const episodeListContainer = document.getElementById("episodeList");
-    episodeListContainer.innerHTML = `<h4>Episodes</h4><div class="episode-seasons"></div>`;
-    const seasonsContainer = episodeListContainer.querySelector(".episode-seasons");
-
-    /* Fixed buttons on top */
-    const fixedNav = document.createElement("div");
-    fixedNav.style=`display:flex; justify-content:center; gap:10px; padding:10px 0; background:#111; color:#00ff66; border-radius:6px; margin-bottom:10px; position:sticky; top:0; z-index:9999;`;
-    const prevBtn=document.createElement("button"); prevBtn.innerText="⏮ Previous"; prevBtn.style="padding:8px 14px;background:#00ff66;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;";
-    const resumeBtn=document.createElement("button"); resumeBtn.innerText="▶ Resume"; resumeBtn.style="padding:8px 14px;background:#00ff66;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;";
-    const nextBtn=document.createElement("button"); nextBtn.innerText="⏭ Next"; nextBtn.style="padding:8px 14px;background:#00ff66;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;";
-    fixedNav.appendChild(prevBtn); fixedNav.appendChild(resumeBtn); fixedNav.appendChild(nextBtn);
-    episodeListContainer.prepend(fixedNav);
-
-    function updateButtons(index) {
-      currentEpisodeIndex=index;
-      prevBtn.disabled=index===0;
-      nextBtn.disabled=index===currentEpisodeList.length-1;
-      prevBtn.onclick=()=>playEpisode(index-1);
-      nextBtn.onclick=()=>playEpisode(index+1);
-      resumeBtn.onclick=()=>{
-        const ep=currentEpisodeList[index];
-        const video=document.querySelector(".episode-video-wrapper video");
-        if(video){ video.currentTime=playbackPositions[ep.id]||0; video.play(); }
-      };
-    }
-
-  function playEpisode(index){
-  const ep = currentEpisodeList[index]; 
-  if(!ep) return;
-
-  const player = document.getElementById("modalPlayer");
-  const epUrl = ep.fileUrl || ep.url;
-  const playable = isDownloadable(epUrl);
-
-  const existing = player.querySelector(".episode-video-wrapper");
-  if(existing) existing.remove();
-
-  const wrapper = document.createElement("div");
-  wrapper.className = "episode-video-wrapper";
-  wrapper.style = `
-    margin-top:10px;
-    position:relative;
-    width:100%;
-    max-height:400px;
-    background:#000;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-  `;
-
-  if(playable){
-    const videoElem = document.createElement("video");
-    videoElem.controls = true;
-    videoElem.src = epUrl;
-    videoElem.style.width = "100%";
-    videoElem.style.maxHeight = "400px";
-    videoElem.playsInline = true;  // important for iOS
-    videoElem.preload = "metadata";
-    videoElem.muted = true;        // iOS allows play only if muted
-
-    // Restore last playback position
-    if(playbackPositions[ep.id]) videoElem.currentTime = playbackPositions[ep.id];
-
-    // Track playback position
-    videoElem.addEventListener("timeupdate", () => {
-      playbackPositions[ep.id] = videoElem.currentTime;
-      localStorage.setItem("playbackPositions", JSON.stringify(playbackPositions));
-    });
-
-    // Green round overlay play button
-    const playButton = document.createElement("button");
-    playButton.textContent = "▶";
-    playButton.style = `
-      position:absolute;
-      top:50%;
-      left:50%;
-      transform:translate(-50%,-50%);
-      background:#00ff66;
-      color:black;
-      border:none;
-      font-size:28px;
-      padding:20px;
-      border-radius:50%;
-      cursor:pointer;
-      box-shadow:0 4px 15px rgba(0,0,0,0.3);
-      z-index:10;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    `;
-
-    // Hover effect
-    playButton.onmouseover = () => {
-      playButton.style.transform = "translate(-50%, -50%) scale(1.1)";
-      playButton.style.boxShadow = "0 6px 20px rgba(0,0,0,0.4)";
-    };
-    playButton.onmouseout = () => {
-      playButton.style.transform = "translate(-50%, -50%) scale(1)";
-      playButton.style.boxShadow = "0 4px 15px rgba(0,0,0,0.3)";
-    };
-
-    // Play video on click — unmute for user
-    playButton.addEventListener("click", () => {
-      videoElem.muted = false;  // unmute on user interaction
-      videoElem.play().catch(err => {
-        console.log("Playback failed:", err);
-      });
-      playButton.style.display = "none";
-    });
-
-    wrapper.appendChild(videoElem);
-    wrapper.appendChild(playButton);
-
-  } else {
-    wrapper.innerHTML = `<iframe src="${epUrl}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
-  }
-
-  player.appendChild(wrapper);
-  updateButtons(index);
-}
-
-    /* ---- Group episodes by season ---- */
-    const seasonsMap={};
-    episodes.forEach((ep)=>{ const sn=ep.season||1; if(!seasonsMap[sn]) seasonsMap[sn]=[]; seasonsMap[sn].push(ep); });
-
-    Object.entries(seasonsMap).forEach(([season, eps])=>{
-      const seasonDiv=document.createElement("div"); seasonDiv.className="season-group";
-      seasonDiv.innerHTML=`<h5 style="cursor:pointer;background:#222;color:#00ff66;padding:6px 10px;border-radius:6px;margin-top:10px;">Season ${season} ▼</h5>`;
-      const epsGrid=document.createElement("div"); epsGrid.className="episodes-grid";
-      epsGrid.style=`display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:6px;`;
-      eps.forEach((ep, idx)=>{
-        const epDiv=document.createElement("div");
-        epDiv.style=`border:1px solid #333;padding:8px;border-radius:6px;background:#111;color:#00ff66;cursor:pointer;display:flex;flex-direction:column;gap:4px;`;
-        epDiv.innerHTML=`<strong>${ep.title||"Episode "+(ep.epNumber||ep.ep||"")}</strong>
-                         ${ep.description?`<small>${ep.description}</small>`:""}
-                         <button style="padding:4px 6px;background:#00ff66;color:#000;border:none;border-radius:4px;font-size:12px;">▶ Play</button>`;
-        epDiv.querySelector("button").addEventListener("click",(e)=>{ e.stopPropagation(); playEpisode(idx); });
-        epsGrid.appendChild(epDiv);
-      });
-      seasonDiv.appendChild(epsGrid);
-      seasonsContainer.appendChild(seasonDiv);
-      seasonDiv.querySelector("h5").addEventListener("click",()=>{ epsGrid.style.display=epsGrid.style.display==="none"?"grid":"none"; });
-    });
-
-    // Show resume notification if playback exists
-    const lastIndex=currentEpisodeList.findIndex(ep=>playbackPositions[ep.id]);
-    if(lastIndex!==-1) showResumeToast(currentEpisodeList[lastIndex], lastIndex);
-  });
-}
-
-/* ---------------- Watch all series for notifications ---------------- */
-async function watchAllEpisodeNotifications() {
-  const moviesColl = collection(db,"movies");
-  const moviesSnapshot = await getDocs(moviesColl);
-  moviesSnapshot.forEach(movieDoc=>{
-    const movieId=movieDoc.id;
-    const movieTitle=movieDoc.data().title||"Untitled Series";
-    if(!episodeUnsubscriptions[movieId]){
-      const unsub=watchEpisodesNotifications(movieId,movieTitle);
-      episodeUnsubscriptions[movieId]=unsub;
-    }
-  });
-}
-
-/* ---------------- Start watching on DOM load ---------------- */
-document.addEventListener("DOMContentLoaded",()=>{ watchAllEpisodeNotifications(); });
-
-
-/* ---------------- MODAL SCROLL LOCK ---------------- */
-const movieModal = document.getElementById("movieModal");
-function lockBodyScroll() { document.body.style.overflow = "hidden"; }
-function unlockBodyScroll() { document.body.style.overflow = ""; }
-
-const modalObserver = new MutationObserver(() => {
-  if (movieModal.style.display === "flex") lockBodyScroll();
-  else unlockBodyScroll();
-});
-modalObserver.observe(movieModal, { attributes: true, attributeFilter: ["style"] });
-
-const modalCloseBtn = document.getElementById("modalClose");
-if (modalCloseBtn) modalCloseBtn.addEventListener("click", () => unlockBodyScroll());
-
-/* ---------------- VIEW DETAILS ---------------- */
-window.viewDetailsByFiltered = async function (index) {
-  const m = window.currentFiltered[index];
-  if (currentUser && currentUser.status !== "Paid") {
-    alert("⚠ Your account is unpaid. Upgrade to Paid to watch or download.");
-    return;
-  }
-
-  const player = document.getElementById("modalPlayer");
-  const episodeList = document.getElementById("episodeList");
-  player.innerHTML = ""; episodeList.innerHTML = "";
-
-  if (m.trailer) {
-    player.innerHTML += `<h4>Trailer</h4>
-      <iframe src="${convertYouTubeLink(m.trailer)}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
-  }
-
-  if (m.fileUrl) {
-    const direct = isDownloadable(m.fileUrl);
-    if (direct) {
-      player.innerHTML += `<h4>Movie</h4>
-        <video controls src="${m.fileUrl}" style="width:100%;max-height:500px;"></video>
-        <a href="${m.fileUrl}" download style="display:inline-block;margin-top:10px;background:#00ff66;
-           padding:10px 15px;border-radius:6px;color:black;font-weight:bold;text-decoration:none;">⬇ Download</a>`;
-    } else {
-      player.innerHTML += `<h4>Movie</h4>
-        <iframe src="${m.fileUrl}" frameborder="0" allowfullscreen style="width:100%;height:500px;"></iframe>`;
-    }
-  }
-
-  if (m.type === "Series") {
-    if (episodeUnsub) episodeUnsub();
-    episodeUnsub = watchEpisodes(m.id);
-  }
-
-  document.getElementById("modalTitle").innerText = m.title;
-  document.getElementById("modalYear").innerText = "Year: " + m.year;
-  document.getElementById("modalGenres").innerText = "Genres: " + (m.genres || []).join(", ");
-  document.getElementById("modalRating").innerText = m.rating ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating*10)}%)` : "";
-  document.getElementById("modalDesc").innerText = m.description || "";
-  document.getElementById("movieModal").style.display = "flex";
-  document.getElementById("modalAddToList").onclick = () => addToWatchlistByFiltered(index);
-};
-
-/* ---------------- WATCH BUTTON (with real-time episodes) ---------------- */
-/* ---------------- WATCH BUTTON (with real-time episodes + resume) ---------------- */
-window.viewAndPlayByFiltered = function(index) {
-  const m = window.currentFiltered[index];
-  if (currentUser && currentUser.status !== "Paid") { 
-    alert("⚠ Your account is unpaid. Upgrade to Paid."); 
-    return; 
-  }
-
-  const player = document.getElementById("modalPlayer");
-  const episodeList = document.getElementById("episodeList");
-  player.innerHTML = ""; 
-  episodeList.innerHTML = "";
-
-  const movieId = m.id;
-
-  // ---- Get last playback position ----
-  let playbackPositions = JSON.parse(localStorage.getItem("moviePlaybackPositions") || "{}");
-  let lastTime = playbackPositions[movieId] || 0;
-
-  // ---- Trailer ----
-  if (m.trailer) {
-    player.innerHTML += `<h4>Trailer</h4>
-      <iframe src="${convertYouTubeLink(m.trailer)}" frameborder="0" allowfullscreen style="width:100%;height:400px;"></iframe>`;
-  }
-
-  // ---- Movie ----
-  if (m.fileUrl) {
-    const direct = isDownloadable(m.fileUrl);
-
-    let movieWrapper = document.createElement("div");
-    movieWrapper.style = `
-      position:relative;
-      width:100%;
-      max-height:500px;
-      background:#000;
-      margin-top:10px;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-    `;
-    
-    if (direct) {
-      // Create video element without autoplay
-      const videoElem = document.createElement("video");
-      videoElem.controls = true;
-      videoElem.src = m.fileUrl;
-      videoElem.style.width = "100%";
-      videoElem.style.maxHeight = "500px";
-      videoElem.playsInline = true; // iPhone inline playback
-      videoElem.preload = "metadata";
-
-      // Restore last playback position
-      if (lastTime > 0) videoElem.currentTime = lastTime;
-
-      // Track playback positions
-      videoElem.addEventListener("timeupdate", () => {
-        playbackPositions[movieId] = videoElem.currentTime;
-        localStorage.setItem("moviePlaybackPositions", JSON.stringify(playbackPositions));
-      });
-
-      // Create green round play button overlay
-      const playButton = document.createElement("button");
-      playButton.textContent = "▶";
-      playButton.style = `
-        position:absolute;
-        top:50%;
-        left:50%;
-        transform:translate(-50%, -50%);
-        background:#00ff66;
-        color:black;
-        border:none;
-        font-size:28px;
-        padding:20px;
-        border-radius:50%;
-        cursor:pointer;
-        box-shadow:0 4px 15px rgba(0,0,0,0.3);
-        z-index:10;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-      `;
-
-      // Hover effect
-      playButton.onmouseover = () => {
-        playButton.style.transform = "translate(-50%, -50%) scale(1.1)";
-        playButton.style.boxShadow = "0 6px 20px rgba(0,0,0,0.4)";
-      };
-      playButton.onmouseout = () => {
-        playButton.style.transform = "translate(-50%, -50%) scale(1)";
-        playButton.style.boxShadow = "0 4px 15px rgba(0,0,0,0.3)";
-      };
-
-      // Play video on button click
-      playButton.addEventListener("click", () => {
-        videoElem.play().catch(err => console.log(err));
-        playButton.style.display = "none";
-      });
-
-      movieWrapper.appendChild(videoElem);
-      movieWrapper.appendChild(playButton);
-
-      // Resume toast if needed
-      if (lastTime > 0) {
-        const resumeToast = document.createElement("div");
-        resumeToast.className = "professional-toast resume-toast";
-        resumeToast.innerHTML = `
-          <span class="toast-title">You left off from ${Math.floor(lastTime/60)}:${Math.floor(lastTime%60).toString().padStart(2,'0')}</span>
-          <div style="display:flex;gap:8px;margin-top:4px;">
-            <button id="resumeMovieBtn" style="padding:4px 8px;background:#00ff66;color:#000;border:none;border-radius:4px;font-size:12px;font-weight:bold;">▶ Resume</button>
-            <button id="restartMovieBtn" style="padding:4px 8px;background:#ff4444;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:bold;">⟲ Restart</button>
-          </div>
-        `;
-        toastContainer.appendChild(resumeToast);
-        closeAllBtn.style.display = "block";
-
-        resumeToast.querySelector("#resumeMovieBtn").onclick = () => {
-          videoElem.currentTime = lastTime;
-          videoElem.play().catch(err => console.log(err));
-          playButton.style.display = "none"; // Hide overlay if resuming
-          resumeToast.remove();
-          if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length)
-            closeAllBtn.style.display = "none";
-        };
-
-        resumeToast.querySelector("#restartMovieBtn").onclick = () => {
-          videoElem.currentTime = 0;
-          videoElem.play().catch(err => console.log(err));
-          playButton.style.display = "none"; // Hide overlay if restarting
-          resumeToast.remove();
-          if (!toastContainer.querySelectorAll(".professional-toast, .resume-toast").length)
-            closeAllBtn.style.display = "none";
-        };
-      }
-
-    } else {
-      movieWrapper.innerHTML = `<iframe src="${m.fileUrl}" frameborder="0" allowfullscreen style="width:100%;height:500px;"></iframe>`;
-    }
-
-    player.appendChild(movieWrapper);
-  }
-
-  if (m.type === "Series") {
-    if (episodeUnsub) episodeUnsub();
-    episodeUnsub = watchEpisodes(m.id);
-  }
-
-  document.getElementById("modalTitle").innerText = m.title;
-  document.getElementById("modalYear").innerText = "Year: " + m.year;
-  document.getElementById("modalGenres").innerText = "Genres: " + (m.genres || []).join(", ");
-  document.getElementById("modalRating").innerText = m.rating ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating*10)}%)` : "";
-  document.getElementById("modalDesc").innerText = m.description || "";
-  document.getElementById("movieModal").style.display = "flex";
-  document.getElementById("modalAddToList").onclick = () => addToWatchlistByFiltered(index);
-};
-
-/* =========================================================
-   GUEST / UNPAID SUBSCRIPTION POPUP (MovieDrift)
-   - Shows on page load
-   - Shows for Guest & Unpaid users
-   - Does NOT show for Paid users
-   - Can appear multiple times if user not logged in
-   - WhatsApp CTA
-========================================================= */
-
-/* ---------- Inject Popup CSS ---------- */
-const guestPopupStyle = document.createElement("style");
-guestPopupStyle.innerHTML = `
-.guest-popup-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.75);
-  backdrop-filter: blur(6px);
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: fadeIn 0.4s ease;
-}
-
-.guest-popup {
-  background: linear-gradient(145deg, #111, #1b1b1b);
-  color: #fff;
-  border-radius: 16px;
-  width: 90%;
-  max-width: 420px;
-  padding: 28px;
-  box-shadow: 0 25px 60px rgba(0,0,0,0.6);
-  text-align: center;
-  animation: slideUp 0.5s ease;
-  font-family: "Segoe UI", system-ui, sans-serif;
-}
-
-.guest-popup h2 {
-  margin: 0 0 10px;
-  color: #00ff66;
-  font-size: 24px;
-}
-
-.guest-popup p {
-  font-size: 14px;
-  opacity: 0.9;
-  margin: 6px 0;
-}
-
-.guest-popup .price {
-  margin: 14px 0;
-  font-size: 16px;
-  font-weight: bold;
-  color: #00ff66;
-}
-
-.guest-benefits {
-  list-style: none;
-  padding: 0;
-  margin: 16px 0;
-  text-align: left;
-}
-
-.guest-benefits li {
-  font-size: 13px;
-  padding: 4px 0;
-  color: #ddd;
-}
-
-.guest-buttons {
-  display: flex;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.guest-btn {
-  flex: 1;
-  padding: 10px;
-  border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
-  border: none;
-  text-decoration: none;
-  text-align: center;
-}
-
-.guest-btn.primary {
-  background: #00ff66;
-  color: #000;
-}
-
-.guest-btn.primary:hover {
-  opacity: 0.9;
-}
-
-.guest-btn.secondary {
-  background: #333;
-  color: #fff;
-}
-
-.guest-btn.secondary:hover {
-  background: #444;
-}
-
-.guest-popup-overlay.hide {
-  animation: fadeOut 0.3s ease forwards;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0 }
-  to { opacity: 1 }
-}
-
-@keyframes fadeOut {
-  from { opacity: 1 }
-  to { opacity: 0 }
-}
-
-@keyframes slideUp {
-  from { transform: translateY(40px); opacity: 0 }
-  to { transform: translateY(0); opacity: 1 }
-}
-`;
-document.head.appendChild(guestPopupStyle);
-
-/* ---------- Popup Logic ---------- */
-function showSubscriptionPopup() {
-  // Do NOT show for paid users
-  if (currentUser && currentUser.status === "Paid") return;
-
-  // Prevent stacking
-  if (document.querySelector(".guest-popup-overlay")) return;
-
-  const overlay = document.createElement("div");
-  overlay.className = "guest-popup-overlay";
-
-  overlay.innerHTML = `
-    <div class="guest-popup">
-      <h2>Welcome to MovieDrift</h2>
-
-      <p>
-        You’re currently watching in
-        <strong>${currentUser ? "Free Access" : "Guest Access"}</strong>
-      </p>
-
-      <p>
-        Unlock the full MovieDrift experience crafted for viewers who want
-        uninterrupted, premium entertainment.
-      </p>
-
-      <p class="price">Premium Access • KSh 50 / month</p>
-
-      <ul class="guest-benefits">
-        <li>✔ Unlimited movies & series</li>
-        <li>✔ Zero ads, zero interruptions</li>
-        <li>✔ Resume watching anytime</li>
-        <li>✔ Instant access to new episodes</li>
-      </ul>
-
-      <div class="guest-buttons">
-        <a
-          href="https://wa.me/254747436668?text=Hello%20MovieDrift%2C%20I%20would%20like%20to%20upgrade%20to%20Premium%20Access"
-          target="_blank"
-          class="guest-btn primary"
-        >
-          Get Premium Access
-        </a>
-
-        <button class="guest-btn secondary" id="guestLaterBtn">
-          Continue as Guest
-        </button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(overlay);
-
-  document.getElementById("guestLaterBtn").onclick = () => {
-    overlay.classList.add("hide");
-    setTimeout(() => overlay.remove(), 300);
-  };
-}
-
-/* ---------- Show on Page Load ---------- */
-document.addEventListener("DOMContentLoaded", () => {
-  loadCurrentUser(); // your existing function
-
-  setTimeout(() => {
-    showSubscriptionPopup();
-  }, 4000);
-});
-
-// ---------------- BACK BUTTON HANDLING ----------------
-(function() {
-  const modalIds = ["movieModal", "watchlistModal"];
-  let openModal = null;
-
-  // Listen for modal openings
-  const observer = new MutationObserver(() => {
-    modalIds.forEach(id => {
-      const modal = document.getElementById(id);
-      if (modal.style.display === "flex") {
-        openModal = modal;
-        // Push state only if a modal opens
-        history.pushState({ modalOpen: true, modalId: id }, "");
-      }
-    });
-  });
-  observer.observe(document.body, { attributes: true, subtree: true, attributeFilter: ["style"] });
-
-  // Handle back button
-  window.addEventListener("popstate", function(event) {
-    if (event.state && event.state.modalOpen && event.state.modalId) {
-      const modal = document.getElementById(event.state.modalId);
-      if (modal) {
-        modal.style.display = "none";
-        openModal = null;
-      }
-    } else if (openModal) {
-      // Close currently open modal
-      openModal.style.display = "none";
-      openModal = null;
-      // Push a new state so user can go back to previous page if desired
-      history.pushState({}, "");
-    }
-    // If no modal is open, back button works normally
-  });
-})();
-// MENU TOGGLE SCRIPT
-const menuToggle = document.getElementById("menuToggle");
-const menu = document.querySelector(".md-menu");
-
-menuToggle.onclick = () => {
-  menuToggle.classList.toggle("active");
-  menu.classList.toggle("active");
-};
-
-
-
-
 </script>
-<script>
-// Show button after scroll
-window.addEventListener("scroll", () => {
-  const btn = document.getElementById("backToTop");
-  if (window.scrollY > 250) {
-    btn.classList.add("show");
-  } else {
-    btn.classList.remove("show");
-  }
-});
-
-// Smooth scroll top
-document.getElementById("backToTop").addEventListener("click", () => {
-  window.scrollTo({ top: 0, behavior: "smooth" });
-});
-
-/* ---------------- TRAILER SHOWCASE + UPCOMING RELEASES FULL SCRIPT ---------------- */
-document.addEventListener("DOMContentLoaded", () => {
-
-  /* ---------------- CONFIG ---------------- */
-  const manualTrailers = []; // add manual trailers if needed
-  const TMDB_API_KEY = "4d2474df29f79bf9c784634d44137413";
-  const tmdbMode = "now_playing";
-  const movieIds = [];
-  const tmdbLimit = 100;
-  const countdownSeconds = 5;
-
-  /* ---------------- DOM ELEMENTS ---------------- */
-  const playerPlaceholder = document.getElementById("ytPlayerPlaceholder");
-  const titleEl = document.getElementById("trailerTitle");
-  const descEl = document.getElementById("trailerDesc");
-  const muteBtn = document.getElementById("muteToggle");
-  const nextBtn = document.getElementById("nextTrailer");
-  const prevBtn = document.getElementById("prevTrailer");
-  const dotsWrap = document.getElementById("trailerDots");
-  const posterGrid = document.getElementById("posterGrid");
-  const searchInput = document.getElementById("searchInput");
-  const trailerSection = document.getElementById("trailerShowcase");
-  const upcomingGrid = document.getElementById("upcomingGrid");
-
-  let playlist = [], currentIndex = 0, ytPlayer = null, isMuted = true;
-  let countdownTimer = null;
-
-  /* ---------------- SEARCH TOGGLE ---------------- */
-  if (searchInput && trailerSection) {
-    searchInput.addEventListener("input", () => {
-      trailerSection.style.display = searchInput.value.trim() ? "none" : "block";
-    });
-  }
-
-  /* ---------------- UTILS ---------------- */
-  function extractYouTubeId(url) {
-    if (!url) return null;
-    if (/^[A-Za-z0-9_-]{11}$/.test(url)) return url;
-    try {
-      const u = new URL(url);
-      if (u.hostname.includes("youtu.be")) return u.pathname.slice(1);
-      if (u.searchParams.has("v")) return u.searchParams.get("v");
-    } catch {}
-    const m = url.match(/[A-Za-z0-9_-]{11}/);
-    return m ? m[0] : null;
-  }
-
-  function todayZero() { const d = new Date(); d.setHours(0,0,0,0); return d; }
-  function daysLeft(date) { return Math.ceil((new Date(date) - todayZero()) / 86400000); }
-
-  /* ---------------- YOUTUBE PLAYER ---------------- */
-  function loadYTAPI() {
-    return new Promise(res => {
-      if (window.YT && window.YT.Player) return res();
-      const s = document.createElement("script");
-      s.src = "https://www.youtube.com/iframe_api";
-      document.head.appendChild(s);
-      window.onYouTubeIframeAPIReady = res;
-    });
-  }
-
-  async function initPlayer() {
-    await loadYTAPI();
-    ytPlayer = new YT.Player(playerPlaceholder, {
-      height: "100%",
-      width: "100%",
-      videoId: playlist[currentIndex].youtubeId,
-      playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, mute: 1 },
-      events: { 
-        onReady: ev => ev.target.playVideo(), 
-        onStateChange: ev => { if (ev.data === 0) startCountdown(); } 
-      }
-    });
-  }
-
-  async function loadAtIndex(i) {
-    stopCountdown();
-    if (!playlist.length) return;
-    currentIndex = (i + playlist.length) % playlist.length;
-    const t = playlist[currentIndex];
-    titleEl.innerText = `${t.title} [${t.mediaType}]`;
-    descEl.innerText = t.desc || "";
-    if (ytPlayer) {
-      ytPlayer.loadVideoById(t.youtubeId);
-      if (isMuted) ytPlayer.mute(); else ytPlayer.unMute();
-    } else {
-      playerPlaceholder.innerHTML = "";
-      await initPlayer();
-    }
-    updateDots();
-  }
-
-  function goNext() { stopCountdown(); loadAtIndex(currentIndex + 1); }
-  function goPrev() { stopCountdown(); loadAtIndex(currentIndex - 1); }
-
-  muteBtn.onclick = () => { 
-    isMuted = !isMuted; 
-    if (ytPlayer) (isMuted ? ytPlayer.mute() : ytPlayer.unMute()); 
-    muteBtn.innerText = isMuted ? "Unmute" : "Mute"; 
-  };
-  nextBtn.onclick = goNext;
-  prevBtn.onclick = goPrev;
-
-  /* ---------------- COUNTDOWN ---------------- */
-  function startCountdown() {
-    if (!playlist.length) return;
-    let timeLeft = countdownSeconds;
-    titleEl.innerText = `${playlist[currentIndex].title} (Next in ${timeLeft}s)`;
-    countdownTimer = setInterval(() => {
-      timeLeft--;
-      titleEl.innerText = `${playlist[currentIndex].title} (Next in ${timeLeft}s)`;
-      if (timeLeft <= 0) { stopCountdown(); goNext(); }
-    }, 1000);
-  }
-
-  function stopCountdown() { if (countdownTimer) clearInterval(countdownTimer); countdownTimer = null; }
-
-  /* ---------------- PLAYLIST ---------------- */
-  async function buildPlaylist() {
-    manualTrailers.forEach(t => {
-      const id = extractYouTubeId(t.youtube);
-      if (id) playlist.push({ youtubeId: id, title: t.title, desc: t.desc, mediaType: t.mediaType || "Movie" });
-    });
-
-    if (!TMDB_API_KEY) { finishPlaylist(); return; }
-
-    try {
-      let mediaList = [];
-      if (movieIds.length) mediaList = movieIds.map(id => ({ id, mediaType: "movie" }));
-      else {
-        const [movieR, tvR] = await Promise.all([
-          fetch(`https://api.themoviedb.org/3/movie/${tmdbMode}?api_key=${TMDB_API_KEY}&language=en-US`),
-          fetch(`https://api.themoviedb.org/3/tv/on_the_air?api_key=${TMDB_API_KEY}&language=en-US`)
-        ]);
-        const [movieJson, tvJson] = await Promise.all([movieR.json(), tvR.json()]);
-        mediaList = [
-          ...movieJson.results.map(m => ({ ...m, mediaType: "Movie" })),
-          ...tvJson.results.map(t => ({ ...t, mediaType: "Series" }))
-        ].slice(0, tmdbLimit);
-      }
-
-      if (mediaList.length) await loadTrailer(mediaList[0]);
-      finishPlaylist();
-
-      for (let i = 1; i < mediaList.length; i++) {
-        setTimeout(() => loadTrailer(mediaList[i]), i * 1500);
-      }
-
-      fetchPosters();
-      fetchUpcomingMedia();
-    } catch (e) { console.warn("TMDB error", e); }
-  }
-
-  async function loadTrailer(item) {
-    try {
-      const type = item.mediaType === "Series" ? "tv" : "movie";
-      const r = await fetch(`https://api.themoviedb.org/3/${type}/${item.id}/videos?api_key=${TMDB_API_KEY}&language=en-US`);
-      const json = await r.json();
-      const vid = json.results.find(v => v.site === "YouTube" && /trailer/i.test(v.type)) || json.results.find(v => v.site === "YouTube");
-      if (vid) {
-        playlist.push({ youtubeId: vid.key, title: item.title || item.name, desc: item.overview || "", mediaType: item.mediaType });
-        if (playlist.length === 1) { renderDots(); loadAtIndex(0); }
-      }
-    } catch(e){ console.warn("Load trailer error", e); }
-  }
-
-  function finishPlaylist() {
-    if (!playlist.length) {
-      titleEl.innerText = "No trailers available";
-      descEl.innerText = "Add manual trailers or configure TMDB.";
-      return;
-    }
-    renderDots();
-    loadAtIndex(0);
-  }
-
-  /* ---------------- DOTS & SHUFFLE ---------------- */
-  function renderDots() {
-    dotsWrap.innerHTML = "";
-    playlist.forEach((_, i) => {
-      const d = document.createElement("div");
-      d.className = "dot";
-      d.onclick = () => loadAtIndex(i);
-      dotsWrap.appendChild(d);
-    });
-    updateDots();
-  }
-
-  function updateDots() {
-    dotsWrap.querySelectorAll(".dot").forEach((d, i) => d.classList.toggle("active", i === currentIndex));
-  }
-
-  function shufflePlaylist() {
-    stopCountdown();
-    for (let i = playlist.length-1; i>0; i--){
-      const j = Math.floor(Math.random()*(i+1));
-      [playlist[i],playlist[j]] = [playlist[j],playlist[i]];
-    }
-    renderDots();
-    loadAtIndex(0);
-  }
-
-  const shuffleBtn = document.createElement("button");
-  shuffleBtn.innerText = "Shuffle";
-  shuffleBtn.className = "trailer-btn";
-  shuffleBtn.style.marginLeft = "10px";
-  shuffleBtn.onclick = shufflePlaylist;
-  document.querySelector(".trailer-controls")?.appendChild(shuffleBtn);
-
-  /* ---------------- POSTER GRID ---------------- */
-  async function fetchPosters() {
-    if (!posterGrid) return;
-    try {
-      const res = await fetch(`https://api.themoviedb.org/3/trending/all/week?api_key=${TMDB_API_KEY}`);
-      const data = await res.json();
-      posterGrid.innerHTML = "";
-      data.results.forEach(item => {
-        if (!item.poster_path) return;
-        const mediaLabel = item.media_type==="movie"?"Movie":item.media_type==="tv"?"Series":"Animation";
-        const card = document.createElement("div");
-        card.className="poster-card";
-        card.innerHTML = `<div class="poster-image-wrapper"><img src="https://image.tmdb.org/t/p/w500${item.poster_path}" alt="${item.title||item.name}"><span class="media-label ${mediaLabel}">${mediaLabel}</span></div><div class="poster-info">${item.title||item.name}</div>`;
-        card.onclick = () => playPosterTrailer(item);
-        posterGrid.appendChild(card);
-      });
-    } catch(e){ console.warn("Poster fetch error", e); }
-  }
-
-  async function playPosterTrailer(item){
-    const title = item.title || item.name;
-    let idx = playlist.findIndex(p => p.title === title);
-    if(idx === -1 && item.id){
-      await loadTrailer(item);
-      renderDots();
-      idx = playlist.findIndex(p => p.title === title);
-    }
-    loadAtIndex(idx);
-  }
-
-  /* ---------------- UPCOMING RELEASES ---------------- */
-  const seen = new Set(JSON.parse(localStorage.getItem("seenUpcoming")||"[]"));
-  async function fetchUpcomingMedia(){
-    if(!upcomingGrid) return;
-    try{
-      const today = todayZero();
-      const upcomingList = [];
-      const addedIds = new Set();
-      for(let page=1; page<=10; page++){
-        const [moviesRes,tvRes] = await Promise.all([
-          fetch(`https://api.themoviedb.org/3/movie/upcoming?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`),
-          fetch(`https://api.themoviedb.org/3/tv/on_the_air?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`)
-        ]);
-        const [moviesData,tvData] = await Promise.all([moviesRes.json(),tvRes.json()]);
-        moviesData.results.forEach(m=>{
-          if(!m.release_date || new Date(m.release_date) <= today) return;
-          const id="m"+m.id; if(addedIds.has(id)) return; addedIds.add(id);
-          upcomingList.push({id,title:m.title,poster:m.poster_path,mediaType:"Movie",releaseDate:m.release_date});
-        });
-        tvData.results.forEach(t=>{
-          if(!t.first_air_date || new Date(t.first_air_date) <= today) return;
-          const id="t"+t.id; if(addedIds.has(id)) return; addedIds.add(id);
-          upcomingList.push({id,title:t.name,poster:t.poster_path,mediaType:"Series",releaseDate:t.first_air_date});
-        });
-      }
-      renderUpcoming(upcomingList);
-      localStorage.setItem("seenUpcoming",JSON.stringify([...seen]));
-    } catch(e){ console.warn("Upcoming media fetch error",e);}
-  }
-
-  function renderUpcoming(list){
-    if(!upcomingGrid) return;
-    upcomingGrid.innerHTML = "";
-    list.forEach(item => {
-      if(!item.poster) return;
-      const releaseYear = item.releaseDate?item.releaseDate.slice(0,4):"TBA";
-      const isNew = !seen.has(item.id);
-      const card = document.createElement("div");
-      card.className="upcoming-card";
-      card.innerHTML = `<div class="upcoming-image-wrapper"><img src="https://image.tmdb.org/t/p/w500${item.poster}" alt="${item.title}"><span class="media-label ${item.mediaType}">${item.mediaType}</span><span class="countdown-badge">${daysLeft(item.releaseDate)} days left</span>${isNew?'<span class="new-badge">NEW</span>':''}</div><div class="upcoming-info"><div class="upcoming-title">${item.title}</div><div class="upcoming-year">${releaseYear}</div></div>`;
-      upcomingGrid.appendChild(card);
-      seen.add(item.id);
-    });
-  }
-
-  setInterval(fetchUpcomingMedia, 15*60*1000);
-
-  /* ---------------- POSTER / UPCOMING SCROLL ---------------- */
-  const posterGridEl = document.getElementById("posterGrid");
-  const leftArrow = document.querySelector(".left-arrow");
-  const rightArrow = document.querySelector(".right-arrow");
-  if(posterGridEl && leftArrow && rightArrow){
-    leftArrow.onclick = ()=> posterGridEl.scrollBy({left:-300,behavior:"smooth"});
-    rightArrow.onclick = ()=> posterGridEl.scrollBy({left:300,behavior:"smooth"});
-  }
-  const upLeft = document.querySelector(".upcoming-arrow.left");
-  const upRight = document.querySelector(".upcoming-arrow.right");
-  if(upLeft && upRight && upcomingGrid){
-    upLeft.onclick = ()=> upcomingGrid.scrollBy({left:-320,behavior:"smooth"});
-    upRight.onclick = ()=> upcomingGrid.scrollBy({left:320,behavior:"smooth"});
-  }
-
-  /* ---------------- CSS ---------------- */
-  /* ---------------- FULL CSS INJECTION ---------------- */
-const style = document.createElement("style");
-style.innerHTML = `
-
-/* ---------------- POSTER GRID & MEDIA LABELS ---------------- */
-.poster-image-wrapper {
-  position: relative;
-  display: inline-block;
-}
-.media-label {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  font-size: 0.7rem;
-  font-weight: bold;
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: #000;
-  z-index: 10;
-}
-.media-label.Movie { background-color: #00ff66; }   /* Green */
-.media-label.Series { background-color: #3399ff; }  /* Blue */
-.media-label.Animation { background-color: #ffcc00; } /* Yellow */
-.poster-card img {
-  width: 100%;
-  display: block;
-  border-radius: 6px;
-}
-.poster-info {
-  margin-top: 5px;
-  text-align: center;
-  font-weight: bold;
-}
-
-
-/* ---------------- UPCOMING RELEASES ---------------- */
-#upcomingSection {
-  padding: 20px 15px;
-  background-color: #000;
-  color: #fff;
-  position: relative;
-}
-#upcomingSection h2 {
-  font-size: 2rem;
-  margin-bottom: 15px;
-  font-weight: 900;
-  color: #00ff66;
-  letter-spacing: 1px;
-}
-.upcoming-wrapper { position: relative; }
-#upcomingGrid {
-  display: flex;
-  gap: 16px;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  padding: 5px 0 10px;
-  scrollbar-width: none;
-}
-#upcomingGrid::-webkit-scrollbar { display: none; }
-.upcoming-card {
-  flex: 0 0 160px;
-  max-width: 160px;
-  background-color: #0a0a0a;
-  border-radius: 10px;
-  transition: transform 0.3s, box-shadow 0.3s;
-  cursor: pointer;
-}
-.upcoming-card:hover {
-  transform: scale(1.05);
-  box-shadow: 0 10px 25px rgba(0, 255, 102, 0.5);
-}
-.upcoming-image-wrapper {
-  position: relative;
-  border-radius: 10px;
-  overflow: hidden;
-}
-.upcoming-image-wrapper img {
-  width: 100%;
-  display: block;
-  border-radius: 10px;
-}
-.upcoming-info {
-  padding: 8px 4px;
-  text-align: center;
-}
-.upcoming-title {
-  font-size: 1rem;
-  font-weight: bold;
-  color: #00ff66;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.upcoming-year { font-size: 0.85rem; color: #00ff66; }
-.media-label {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  font-size: 0.7rem;
-  font-weight: bold;
-  padding: 2px 6px;
-  border-radius: 5px;
-  color: #000;
-  z-index: 10;
-}
-.media-label.Movie { background-color: #00ff66; }
-.media-label.Series { background-color: #3399ff; }
-.countdown-badge {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
-  background: #000;
-  color: #00ff66;
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 6px;
-}
-.new-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: #ff004c;
-  color: #fff;
-  font-size: 11px;
-  padding: 4px 6px;
-  border-radius: 6px;
-}
-
-/* ---------------- UPCOMING GRID ARROWS ---------------- */
-.upcoming-arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(0,0,0,0.7);
-  border: none;
-  color: #00ff66;
-  font-size: 22px;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  cursor: pointer;
-  z-index: 20;
-}
-.upcoming-arrow.left { left: -5px; }
-.upcoming-arrow.right { right: -5px; }
-
-/* ---------------- RESPONSIVE ---------------- */
-@media (max-width: 1200px) { .upcoming-card { flex: 0 0 140px; max-width: 140px; } }
-@media (max-width: 992px) { .upcoming-card { flex: 0 0 130px; max-width: 130px; } }
-@media (max-width: 992px) { .upcoming-arrow { width: 32px; height: 32px; font-size: 20px; } }
-@media (max-width: 768px) { .upcoming-card { flex: 0 0 120px; max-width: 120px; } #upcomingGrid { gap: 12px; } }
-@media (max-width: 480px) { 
-  .upcoming-card { flex: 0 0 100px; max-width: 100px; } 
-  #upcomingGrid { gap: 8px; padding: 5px 0 8px; } 
-  #upcomingSection h2 { font-size: 1.5rem; } 
-  .upcoming-arrow { width: 28px; height: 28px; font-size: 18px; } 
-}
-
-`;
-document.head.appendChild(style);
-
-  /* ---------------- START ---------------- */
-  buildPlaylist();
-
-});
-
-let compareFirstMovie = null; // stores first selected movie index
-
-function renderMovies() {
-  const grid = document.getElementById("grid");
-  const searchText = document.getElementById("search").value.toLowerCase();
-  const selectedGenre = genreFilter.value;
-  const selectedYear = yearFilter.value;
-  const selectedType = document.getElementById("typeFilter").value;
-
-  grid.innerHTML = "";
-
-  const filtered = movies.filter(m => {
-    const matchesSearch = (m.title || "").toLowerCase().includes(searchText);
-    const matchesGenre = !selectedGenre || (m.genres && m.genres.includes(selectedGenre));
-    const matchesYear  = !selectedYear || m.year == selectedYear;
-    const matchesType  = !selectedType || m.type === selectedType || !m.type;
-    return matchesSearch && matchesGenre && matchesYear && matchesType;
-  });
-
-  const now = Date.now();
-
-  filtered.forEach((m, index) => {
-    let badgesHTML = "";
-
-    if (m.type !== "Series" && now - (m.createdAt || 0) < 86400000) {
-      badgesHTML += `<div class="movie-glow-badge fade-out-24h">NEW MOVIE</div>`;
-    }
-
-    if (m.views && m.views >= 1000) {
-      badgesHTML += `<div class="hot-badge">HOT</div>`;
-    }
-
-    if (m.type === "Series" && m.episodes?.length) {
-      const latest  = m.episodes[m.episodes.length - 1];
-      const isFresh = now - (latest.createdAt || now) < 86400000;
-      const ep      = latest.ep || 0;
-      const season  = latest.season || 1;
-      if (isFresh && !hasWatched(m.id, ep)) {
-        badgesHTML += `<div class="new-badge fade-out-24h">NEW Episode S${season}E${ep}</div>`;
-      }
-    }
-
-    const ratingText = m.rating ? `${m.rating.toFixed(1)} / 10 (${Math.round(m.rating * 10)}%)` : "";
-
-    const card = document.createElement("div");
-    card.className = "card";
-
-    card.innerHTML = `
-      <div class="poster-wrapper" style="position:relative;">
-        <div class="badges-container">${badgesHTML}</div>
-        <img class="poster" src="${m.poster || ""}">
-        <div class="compare-circle" onclick="selectSecondMovie(${index})" title="Select for comparison"></div>
-      </div>
-
-      <div class="card-body">
-        <h3 class="movie-title">${(m.title || '').replace(/</g,'&lt;')}</h3>
-        <div class="meta">${m.year || ''} · ${(m.genres || []).join(", ")}</div>
-        <div class="rating">${ratingText}</div>
-
-        <div class="card-actions">
-          <button class="btn-icon" title="Details" onclick="protectedAction('details', ${index})">Details</button>
-          <button class="btn-icon" title="Add to Watchlist" onclick="event.stopPropagation(); protectedAction('add', ${index})">Add</button>
-          <button class="btn-icon" title="Watch Movie" onclick="protectedAction('watch', ${index})">Watch</button>
-          <button class="btn-icon" title="Compare" onclick="event.stopPropagation(); openCompare(${index})">Compare</button>
-        </div>
-      </div>
-    `;
-
-    card.querySelector(".poster").onclick = () => protectedAction("watch", index);
-    grid.appendChild(card);
-  });
-
-  window.currentFiltered = filtered;
-}
-
-// Open first movie or second movie selection
-function openCompare(index) {
-  const selectedMovie = window.currentFiltered[index];
-
-  if (!compareFirstMovie) {
-    compareFirstMovie = selectedMovie;
-    alert("🎬 First movie selected. Please select another movie to compare.");
-
-    document.querySelectorAll("#grid .card").forEach((card, i) => {
-      if (i !== index) {
-        const circle = card.querySelector(".compare-circle");
-        if (circle) circle.style.display = "block";
-      }
-    });
-  } else {
-    selectSecondMovie(index);
-  }
-}
-
-// Open modal with both movies
-function selectSecondMovie(index) {
-  const secondMovie = window.currentFiltered[index];
-  if (!compareFirstMovie || !secondMovie) return;
-
-  // Open modal
-  openCompareModal(compareFirstMovie, secondMovie);
-
-  // Reset
-  compareFirstMovie = null;
-  document.querySelectorAll(".compare-circle").forEach(c => c.style.display = "none");
-}
-
-function openCompareModal(movie1, movie2) {
-  const modal = document.getElementById("compareModal");
-  modal.style.display = "flex";
-
-  // Set movie posters and titles
-  document.getElementById("compareMovie1").querySelector("img").src = movie1.poster;
-  document.getElementById("compareMovie1").querySelector("h3").textContent = movie1.title;
-
-  document.getElementById("compareMovie2").querySelector("img").src = movie2.poster;
-  document.getElementById("compareMovie2").querySelector("h3").textContent = movie2.title;
-
-  // Animated stat bars
-  document.getElementById("ratingBar").style.width = `${Math.round(Math.max(movie1.rating||0, movie2.rating||0)/10*100)}%`;
-  document.getElementById("viewsBar").style.width = `${Math.min(Math.max(movie1.views||0, movie2.views||0)/1000*100, 100)}%`;
-
-  const now = Date.now();
-  const factors = [];
-
-  // Rating comparison
-  if ((movie1.rating || 0) > (movie2.rating || 0)) factors.push({ movie: movie1, reason: "higher rating" });
-  else if ((movie2.rating || 0) > (movie1.rating || 0)) factors.push({ movie: movie2, reason: "higher rating" });
-
-  // Popularity comparison
-  const views1 = movie1.views || 0;
-  const views2 = movie2.views || 0;
-  if (views1 > views2) factors.push({ movie: movie1, reason: "more popular" });
-  else if (views2 > views1) factors.push({ movie: movie2, reason: "more popular" });
-
-  // Recency comparison (new releases within 7 days)
-  const age1 = now - (movie1.createdAt || now);
-  const age2 = now - (movie2.createdAt || now);
-  const weekMs = 7 * 24 * 60 * 60 * 1000;
-  if (age1 < age2 && age1 < weekMs) factors.push({ movie: movie1, reason: "new release" });
-  else if (age2 < age1 && age2 < weekMs) factors.push({ movie: movie2, reason: "new release" });
-
-  // Duration & type comparison for time-aware recommendation
-  const duration1 = movie1.duration || 0;
-  const duration2 = movie2.duration || 0;
-
-  if (movie1.type === "Series" && movie2.type !== "Series") {
-    factors.push({ movie: movie2, reason: `shorter watch time (${movie2.type})` });
-  } else if (movie2.type === "Series" && movie1.type !== "Series") {
-    factors.push({ movie: movie1, reason: `shorter watch time (${movie1.type})` });
-  } else if (duration1 > duration2) {
-    factors.push({ movie: movie2, reason: "shorter duration" });
-  } else if (duration2 > duration1) {
-    factors.push({ movie: movie1, reason: "shorter duration" });
-  }
-
-  // Count the factor scores
-  const score = {};
-  [movie1, movie2].forEach(m => score[m.title] = 0);
-  factors.forEach(f => score[f.movie.title]++);
-
-  // Decide final recommendation
-  let finalRecommendation = "";
-  if (score[movie1.title] > score[movie2.title]) finalRecommendation = ` Watch "${movie1.title}" first, then "${movie2.title}".`;
-  else if (score[movie2.title] > score[movie1.title]) finalRecommendation = ` Watch "${movie2.title}" first, then "${movie1.title}".`;
-  else finalRecommendation = ` Both are similar. You can choose either first.`;
-
-  // Build explanation text
-  let explanation = factors.map(f => ` "${f.movie.title}" is favored because of ${f.reason}.`).join("<br>");
-
-  // Display in AI container
-  const aiContainer = document.getElementById("aiExplanation");
-  aiContainer.innerHTML = `
-    <div>
-      <div style="margin-bottom: 8px;">Analysis:</div>
-      ${explanation || 'No clear preference based on rating, popularity, recency, duration, or type.'}
-      <div style="margin-top: 8px; font-weight: bold;">${finalRecommendation}</div>
-    </div>
-  `;
-}
-
-function closeCompareModal() {
-  document.getElementById("compareModal").style.display = "none";
-}
-
-</script>
-
-<script>
-// ===== NEW YEAR LOGIC =====
-const overlay = document.getElementById('newYearOverlay');
-const yearText = document.getElementById('yearText');
-const today = new Date();
-const month = today.getMonth(); // 0=Jan
-const day = today.getDate();
-const year = today.getFullYear();
-
-// Show overlay only between Jan 1 - Jan 20
-if(month === 0 && day <= 10) {
-  yearText.textContent = year; // dynamic year
-
-  const storageKey = `newYearShown-${year}`;
-  if(!localStorage.getItem(storageKey)) {
-    overlay.style.display = 'flex';
-    localStorage.setItem(storageKey, 'true');
-
-    // Fade out overlay after 10 seconds
-    setTimeout(() => {
-      overlay.style.opacity = 0;
-      setTimeout(() => overlay.remove(), 2000);
-    }, 10000);
-  } else {
-    overlay.remove();
-  }
-} else {
-  overlay.remove();
-}
-
-/* ===== RESPONSIVE TEXT ===== */
-function scaleText() {
-  const textElem = document.getElementById('newYearText');
-  const width = window.innerWidth;
-  if(width < 400){
-    textElem.style.fontSize = '1.8rem';
-  } else if(width < 768){
-    textElem.style.fontSize = '2.5rem';
-  } else {
-    textElem.style.fontSize = '3rem';
-  }
-}
-scaleText();
-window.addEventListener('resize', scaleText);
-
-/* ===== FIREWORKS CANVAS ===== */
-const canvasFW = document.getElementById('fireworks');
-const ctxFW = canvasFW.getContext('2d');
-
-function resizeFW() {
-  canvasFW.width = window.innerWidth;
-  canvasFW.height = window.innerHeight;
-}
-resizeFW();
-window.addEventListener('resize', resizeFW);
-
-/* ===== FIREWORK & PARTICLE ===== */
-class Firework {
-  constructor() {
-    this.x = Math.random() * canvasFW.width;
-    this.y = canvasFW.height;
-    this.targetY = Math.random() * canvasFW.height / 2;
-    this.radius = 2;
-    this.color = `hsl(${Math.random()*360},100%,60%)`;
-    this.speed = Math.random() * 3 + 3;
-    this.trail = [];
-  }
-  update() {
-    this.trail.push({x:this.x,y:this.y});
-    if(this.trail.length>10) this.trail.shift();
-    this.y -= this.speed;
-    if(this.y <= this.targetY){
-      // Reduce number of particles for mobile
-      const count = window.innerWidth < 500 ? 15 : 30;
-      for(let i=0;i<count;i++) particles.push(new Particle(this.x,this.y,this.color));
-      return true;
-    }
-    return false;
-  }
-  draw() {
-    ctxFW.beginPath();
-    for(let i=0;i<this.trail.length;i++){
-      const t = this.trail[i];
-      ctxFW.globalAlpha = i/this.trail.length;
-      ctxFW.fillStyle = this.color;
-      ctxFW.beginPath();
-      ctxFW.arc(t.x,t.y,this.radius,0,Math.PI*2);
-      ctxFW.fill();
-    }
-    ctxFW.globalAlpha = 1;
-    ctxFW.beginPath();
-    ctxFW.arc(this.x,this.y,this.radius,0,Math.PI*2);
-    ctxFW.fillStyle = this.color;
-    ctxFW.shadowColor = this.color;
-    ctxFW.shadowBlur = 10;
-    ctxFW.fill();
-  }
-}
-
-class Particle {
-  constructor(x,y,color){
-    this.x=x; this.y=y;
-    this.radius=Math.random()*2+1;
-    this.color=color;
-    this.velocityX=(Math.random()-0.5)*6;
-    this.velocityY=(Math.random()-0.5)*6;
-    this.life=60;
-  }
-  update(){ this.x+=this.velocityX; this.y+=this.velocityY; this.life--; }
-  draw(){
-    ctxFW.beginPath();
-    ctxFW.arc(this.x,this.y,this.radius,0,Math.PI*2);
-    ctxFW.fillStyle=this.color;
-    ctxFW.shadowColor=this.color;
-    ctxFW.shadowBlur=10;
-    ctxFW.fill();
-  }
-}
-
-let fireworks=[], particles=[];
-function animateFW(){
-  if(!document.getElementById('newYearOverlay')) return;
-  ctxFW.fillStyle='rgba(0,0,0,0.2)';
-  ctxFW.fillRect(0,0,canvasFW.width,canvasFW.height);
-  if(Math.random() < 0.05) fireworks.push(new Firework());
-  fireworks = fireworks.filter(fw=>{ fw.draw(); return !fw.update(); });
-  particles = particles.filter(p=>{ p.draw(); p.update(); return p.life>0; });
-  requestAnimationFrame(animateFW);
-}
-animateFW();
-
-/* ===== CONFETTI CANVAS ===== */
-const canvasCF = document.getElementById('confetti');
-const ctxCF = canvasCF.getContext('2d');
-
-function resizeCF() {
-  canvasCF.width = window.innerWidth;
-  canvasCF.height = window.innerHeight;
-}
-resizeCF();
-window.addEventListener('resize', resizeCF);
-
-class Confetti {
-  constructor(){
-    this.x=Math.random()*canvasCF.width;
-    this.y=Math.random()*-canvasCF.height;
-    this.size=Math.random()*8+4;
-    // smaller size on mobile
-    if(window.innerWidth < 500) this.size = Math.random()*5+2;
-    this.color=`hsl(${Math.random()*360},100%,60%)`;
-    this.speedY=Math.random()*3+2;
-    this.speedX=(Math.random()-0.5)*2;
-    this.rotation=Math.random()*360;
-    this.rotationSpeed=(Math.random()-0.5)*10;
-  }
-  update(){
-    this.x+=this.speedX;
-    this.y+=this.speedY;
-    this.rotation+=this.rotationSpeed;
-    if(this.y>canvasCF.height)this.y=-10;
-  }
-  draw(){
-    ctxCF.save();
-    ctxCF.translate(this.x,this.y);
-    ctxCF.rotate(this.rotation*Math.PI/180);
-    ctxCF.fillStyle=this.color;
-    ctxCF.shadowColor=this.color;
-    ctxCF.shadowBlur=8;
-    ctxCF.fillRect(-this.size/2,-this.size/2,this.size,this.size);
-    ctxCF.restore();
-  }
-}
-
-let confettis=[];
-for(let i=0;i<150;i++){
-  confettis.push(new Confetti());
-}
-
-function animateCF(){
-  if(!document.getElementById('newYearOverlay')) return;
-  ctxCF.clearRect(0,0,canvasCF.width,canvasCF.height);
-  confettis.forEach(c=>{ c.update(); c.draw(); });
-  requestAnimationFrame(animateCF);
-}
-animateCF();
-</script>
-
 
 </body>
 </html>
